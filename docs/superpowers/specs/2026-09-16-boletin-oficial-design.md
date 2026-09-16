@@ -2,7 +2,7 @@
 
 ## Estado
 
-Draft v0.5 — 2026-09-16
+Draft v0.6 — 2026-09-16
 
 ## Contexto
 
@@ -104,7 +104,11 @@ Accede mediante MCP a resultados acotados, citables y trazables a documentos ofi
 - REQ-12: El sistema debe informar cuando no encuentra resultados confiables.
 - REQ-13: La API debe permitir limitar la cantidad de resultados y devolver metadatos suficientes para citarlos.
 - REQ-14: El usuario debe poder valorar cada resultado como útil o no útil mediante íconos de pulgar arriba / pulgar abajo; la valoración debe quedar asociada a la consulta y al fragmento mostrado.
-- REQ-15: El sistema debe descartar del ranking los fragmentos cuya similitud con la consulta esté por debajo de un umbral mínimo configurable (parámetro interno del servicio, no expuesto al usuario ni en la API pública). Si ningún fragmento supera el umbral, la búsqueda debe devolver una lista vacía y disparar el aviso de REQ-12.
+- REQ-15: En modo SEMANTIC (default), el sistema debe descartar del ranking los fragmentos cuya similitud con la consulta esté por debajo de un umbral mínimo configurable (parámetro interno del servicio, no expuesto al usuario ni en la API pública). Si ningún fragmento supera el umbral, la búsqueda debe devolver una lista vacía y disparar el aviso de REQ-12. En modo HYBRID, una coincidencia de texto exacto (REQ-28) exime a un fragmento de este umbral; en modo ALL no se aplica ningún umbral (REQ-29).
+- REQ-26: La búsqueda debe permitir elegir entre los modos SEMANTIC (default, solo vectorial), HYBRID (vectorial + texto exacto) y ALL (unión sin umbral) mediante un parámetro de la API; un valor de modo inválido debe rechazarse.
+- REQ-27: El sistema debe indexar el texto de cada fragmento para búsqueda de texto completo en español, usada en los modos HYBRID y ALL.
+- REQ-28: En modo HYBRID, el sistema debe combinar el orden por similitud vectorial y el orden por coincidencia de texto en un único ranking; un fragmento con coincidencia de texto exacto debe aparecer aunque su similitud vectorial esté por debajo del umbral de REQ-15.
+- REQ-29: En modo ALL, el sistema debe devolver la unión de los candidatos vectoriales y textuales sin aplicar ningún umbral de similitud ni de relevancia de texto.
 
 ### Clasificación
 
@@ -197,14 +201,13 @@ La columna `jurisdiccion` debe existir desde el inicio aunque solo se cargue Có
 
 ## 8. Búsqueda e indexación
 
-La búsqueda inicial será vectorial con filtro por `fecha_publicacion`. Se recomienda dejar una segunda vía textual disponible para nombres propios, números de ley, decretos y códigos que una búsqueda semántica puede tratar de forma imperfecta.
+La búsqueda tiene filtro por `fecha_publicacion` y tres modos (REQ-26):
 
-La estrategia futura será:
+- **SEMANTIC** (default): solo vectorial, con el umbral de REQ-15.
+- **HYBRID**: combina la búsqueda vectorial con una búsqueda de texto completo en español sobre `fragmentos.texto_tsv` (columna generada, con índice GIN), para nombres propios, números de ley, decretos, códigos y términos sueltos que una búsqueda puramente semántica puede tratar de forma imperfecta (REQ-27). Una coincidencia de texto exacto rescata un fragmento aunque su similitud vectorial no supere el umbral (REQ-28). Se agregó tras encontrar que consultas de una sola palabra (ej. "salud") no siempre superan el umbral vectorial aunque el término aparezca literalmente en el texto.
+- **ALL**: unión de candidatos vectoriales y textuales sin ningún umbral (REQ-29); modo exploración, máximo recall.
 
-- búsqueda vectorial para significado y contexto;
-- búsqueda textual para coincidencias exactas;
-- filtros relacionales para fechas, jurisdicción y tags;
-- combinación de rankings mediante una estrategia simple de fusión.
+Los rankings de HYBRID y ALL se combinan con *Reciprocal Rank Fusion* (RRF): cada fragmento suma `1/(k + posición)` por cada lista (vectorial, textual) en la que aparece, con `k=60`. Evita normalizar escalas incompatibles (similitud coseno 0-1 vs. `ts_rank` de Postgres).
 
 Umbral de similitud (REQ-15): el score se calcula como similitud coseno entre el embedding de la consulta y el de cada fragmento (0 a 1, a partir de vectores normalizados), y se filtra por resultado, no por consulta completa — se descartan los fragmentos por debajo del umbral antes de aplicar el límite de cantidad de REQ-13. Como todavía no hay corpus real para calibrarlo, arranca en un valor conservador provisional y se ajusta durante la evaluación manual de la sección 12.
 

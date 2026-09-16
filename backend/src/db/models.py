@@ -14,6 +14,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 EMBEDDING_DIM = 1024  # dimensión de salida de Qwen/Qwen3-Embedding-0.6B
@@ -73,6 +75,12 @@ class Fragmento(Base):
     fecha_publicacion: Mapped[datetime.date] = mapped_column(nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    # Búsqueda de texto completo en español (modos HYBRID/ALL, ver REQ-28 a
+    # REQ-31 del design spec). Columna generada: Postgres la mantiene sola,
+    # no se escribe desde la app.
+    texto_tsv: Mapped[str | None] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('spanish', texto)", persisted=True), nullable=True
+    )
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -95,6 +103,7 @@ class Fragmento(Base):
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
+        Index("ix_fragmentos_texto_tsv_gin", "texto_tsv", postgresql_using="gin"),
     )
 
 

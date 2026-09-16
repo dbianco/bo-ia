@@ -61,7 +61,8 @@ label {
 }
 
 input[type="text"],
-input[type="date"] {
+input[type="date"],
+select {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid var(--border);
@@ -91,6 +92,7 @@ button.boton-valoracion {
 
 button.boton-valoracion:focus-visible,
 input:focus-visible,
+select:focus-visible,
 button:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
@@ -126,4 +128,14 @@ button:focus-visible {
 .valoracion-agradecimiento {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.badge-texto {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--muted);
 }

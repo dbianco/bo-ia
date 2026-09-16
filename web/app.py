@@ -30,9 +30,13 @@ def home(request: Request) -> HTMLResponse:
 
 @app.get("/resultados", response_class=HTMLResponse)
 def resultados(
-    request: Request, q: str, date_from: str | None = None, date_to: str | None = None
+    request: Request,
+    q: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    mode: str = "semantic",
 ) -> HTMLResponse:
-    params: dict[str, str] = {"q": q}
+    params: dict[str, str] = {"q": q, "mode": mode}
     if date_from:
         params["date_from"] = date_from
     if date_to:

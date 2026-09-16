@@ -27,6 +27,14 @@
           <input type="date" id="date_to" name="date_to">
         </div>
       </div>
+      <div>
+        <label for="mode">Modo de búsqueda</label>
+        <select id="mode" name="mode">
+          <option value="semantic" selected>Semántica (default)</option>
+          <option value="hybrid">Híbrida (semántica + texto exacto)</option>
+          <option value="all">Todo (sin filtrar por confianza)</option>
+        </select>
+      </div>
       <button type="submit">Buscar</button>
       <span id="buscando" class="htmx-indicator" role="status">Buscando…</span>
     </form>

@@ -56,3 +56,13 @@ Orden: toda dependencia aparece antes que la tarea que depende de ella. `[P]` ma
 - [x] T029 [P] Escribir una checklist manual de accesibilidad (navegación por teclado, controles etiquetados) para la página de búsqueda contra WCAG 2.1 AA en `backend/tests/manual/accessibility-checklist.md`, depends on T026, depends on T027
 - [x] T030 Actualizar `README.md` con instrucciones de arranque (`docker compose up --build`, datos de seed, cómo correr los tests) en `README.md`, depends on T003, depends on T025, depends on T028
 - [x] T031 Correr la suite completa de tests y el smoke test, confirmar que cada escenario de aceptación y criterio de éxito de `spec.md` se cumple, y registrar los resultados como evidencia para la fase `verify`, depends on T022, depends on T023, depends on T024, depends on T025, depends on T026, depends on T027, depends on T028, depends on T029, depends on T030
+
+### Follow-on: búsqueda híbrida (post-verify)
+
+Agregado tras un hallazgo real durante el uso manual del MVP ya verificado: la consulta "salud" no encontraba los boletines que contienen la palabra literal, porque el embedding de una palabra suelta (similitud 0.41-0.45) queda por debajo del umbral de REQ-15 (0.5), aunque el ranking semántico ya los ubicaba primero. Corresponde a REQ-26 a REQ-29 del design spec (v0.6).
+
+- [x] T032 Agregar la columna generada `fragmentos.texto_tsv` (tsvector en español) con índice GIN, vía migración de Alembic, depends on T008
+- [x] T033 Implementar la fusión de rankings por Reciprocal Rank Fusion en `backend/src/processor/hybrid.py`, depends on T032
+- [x] T034 Agregar el parámetro `mode` (SEMANTIC/HYBRID/ALL) al endpoint de búsqueda, combinando candidatos vectoriales y textuales por RRF, en `backend/src/api/search.py`, depends on T033
+- [x] T035 Verificar contra el stack real de Docker que "salud" devuelve 0 resultados en SEMANTIC, 2 en HYBRID (los dos que contienen la palabra) y 6 en ALL, depends on T034
+- [x] T036 Actualizar REQ-15 y la sección 8 del design spec para reflejar los tres modos, depends on T034
