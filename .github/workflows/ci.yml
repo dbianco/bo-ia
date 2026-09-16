@@ -50,7 +50,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Levantar el stack completo con un solo comando (FR-016)
-        run: docker compose up -d --build --wait
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait
 
       - name: Verificar búsqueda real contra los datos de ejemplo (FR-017)
         run: |
