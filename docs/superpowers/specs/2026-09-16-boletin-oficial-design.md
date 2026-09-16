@@ -2,7 +2,7 @@
 
 ## Estado
 
-Draft v0.2 — 2026-09-16
+Draft v0.3 — 2026-09-16
 
 ## Contexto
 
@@ -104,20 +104,21 @@ Accede mediante MCP a resultados acotados, citables y trazables a documentos ofi
 - REQ-12: El sistema debe informar cuando no encuentra resultados confiables.
 - REQ-13: La API debe permitir limitar la cantidad de resultados y devolver metadatos suficientes para citarlos.
 - REQ-14: El usuario debe poder valorar cada resultado como útil o no útil mediante íconos de pulgar arriba / pulgar abajo; la valoración debe quedar asociada a la consulta y al fragmento mostrado.
+- REQ-15: El sistema debe descartar del ranking los fragmentos cuya similitud con la consulta esté por debajo de un umbral mínimo configurable (parámetro interno del servicio, no expuesto al usuario ni en la API pública). Si ningún fragmento supera el umbral, la búsqueda debe devolver una lista vacía y disparar el aviso de REQ-12.
 
 ### Clasificación
 
-- REQ-15: El modelo de tagging debe soportar múltiples tags por documento o fragmento.
-- REQ-16: Cada predicción debe incluir tag, confianza, versión del modelo y fecha de procesamiento.
-- REQ-17: El sistema debe permitir configurar umbrales por tag.
-- REQ-18: Una predicción de baja confianza no debe convertirse automáticamente en una suscripción activa.
+- REQ-16: El modelo de tagging debe soportar múltiples tags por documento o fragmento.
+- REQ-17: Cada predicción debe incluir tag, confianza, versión del modelo y fecha de procesamiento.
+- REQ-18: El sistema debe permitir configurar umbrales por tag.
+- REQ-19: Una predicción de baja confianza no debe convertirse automáticamente en una suscripción activa.
 
 ### Futuro MCP
 
-- REQ-19: El servidor MCP debe exponer una operación de búsqueda con consulta y filtros de fecha.
-- REQ-20: El servidor MCP debe devolver siempre la URL oficial y la fecha del documento utilizado.
-- REQ-21: El servidor MCP debe limitar el volumen de resultados y evitar acceso irrestricto a la base.
-- REQ-22: Las consultas MCP deben quedar auditadas con herramienta, fecha, parámetros normalizados y cantidad de resultados.
+- REQ-20: El servidor MCP debe exponer una operación de búsqueda con consulta y filtros de fecha.
+- REQ-21: El servidor MCP debe devolver siempre la URL oficial y la fecha del documento utilizado.
+- REQ-22: El servidor MCP debe limitar el volumen de resultados y evitar acceso irrestricto a la base.
+- REQ-23: Las consultas MCP deben quedar auditadas con herramienta, fecha, parámetros normalizados y cantidad de resultados.
 
 ## 6. Arquitectura propuesta
 
@@ -199,6 +200,8 @@ La estrategia futura será:
 - filtros relacionales para fechas, jurisdicción y tags;
 - combinación de rankings mediante una estrategia simple de fusión.
 
+Umbral de similitud (REQ-15): el score se calcula como similitud coseno entre el embedding de la consulta y el de cada fragmento (0 a 1, a partir de vectores normalizados), y se filtra por resultado, no por consulta completa — se descartan los fragmentos por debajo del umbral antes de aplicar el límite de cantidad de REQ-13. Como todavía no hay corpus real para calibrarlo, arranca en un valor conservador provisional y se ajusta durante la evaluación manual de la sección 12.
+
 ## 9. Tagging y notebook de entrenamiento
 
 El notebook debe tratar el tagging como clasificación multilabel documental. No se debe confundir con un agente autónomo: el resultado esperado es un modelo reproducible de predicción de etiquetas.
@@ -264,6 +267,7 @@ No se requiere una interfaz conversacional en el MVP. La conversación queda par
 - Consulta con filtro de fechas funcionando en todos los resultados.
 - Tiempo de respuesta objetivo menor a 2 segundos para búsquedas comunes sobre el corpus inicial.
 - Evaluación manual positiva en al menos 80% de las primeras consultas representativas.
+- Verificación manual de que consultas fuera de dominio activan el aviso de "sin resultados confiables" (REQ-12/REQ-15), y de que el umbral no descarta resultados relevantes en consultas dentro de dominio; esta verificación es la que calibra el valor final del umbral.
 
 ### Tagging
 
