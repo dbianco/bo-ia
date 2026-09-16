@@ -19,11 +19,11 @@ Orden: toda dependencia aparece antes que la tarea que depende de ella. `[P]` ma
 
 ### Modelo de datos
 
-- [ ] T007 Escribir la migración de Alembic que habilita pgvector y crea la tabla `boletines`, con su migración `down`, en `backend/src/db/migrations/`, depends on T006
-- [ ] T008 Escribir la migración de Alembic que crea la tabla `fragmentos` con columna vectorial, con su migración `down`, en `backend/src/db/migrations/`, depends on T007
-- [ ] T009 [P] Escribir la migración de Alembic que crea `tags` y `fragmento_tags`, con su migración `down`, en `backend/src/db/migrations/`, depends on T007
-- [ ] T010 [P] Escribir la migración de Alembic que crea `valoraciones`, con su migración `down`, en `backend/src/db/migrations/`, depends on T007
-- [ ] T011 Escribir un test de rollback que verifique que cada `up` tiene un `down` funcional en `backend/tests/test_migrations.py`, depends on T008, depends on T009, depends on T010
+- [x] T007 Escribir la migración de Alembic que habilita pgvector y crea la tabla `boletines`, con su migración `down`, en `backend/src/db/migrations/`, depends on T006
+- [x] T008 Escribir la migración de Alembic que crea la tabla `fragmentos` con columna vectorial, con su migración `down`, en `backend/src/db/migrations/`, depends on T007
+- [x] T009 [P] Escribir la migración de Alembic que crea `tags` y `fragmento_tags`, con su migración `down`, en `backend/src/db/migrations/`, depends on T007
+- [x] T010 [P] Escribir la migración de Alembic que crea `valoraciones`, con su migración `down`, en `backend/src/db/migrations/`, depends on T007
+- [x] T011 Escribir un test de rollback que verifique que cada `up` tiene un `down` funcional en `backend/tests/test_migrations.py`, depends on T008, depends on T009, depends on T010
 
 ### Tests primero (TDD)
 

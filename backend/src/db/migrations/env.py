@@ -1,10 +1,14 @@
 import os
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -27,10 +31,9 @@ config.set_main_option("sqlalchemy.url", database_url)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# TODO(T007): apuntar a la metadata real una vez que existan los modelos
-# de SQLAlchemy (boletines, fragmentos, tags, fragmento_tags, valoraciones)
-# en backend/src/db/models.py, para habilitar autogenerate.
-target_metadata = None
+from src.db.models import Base  # noqa: E402
+
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

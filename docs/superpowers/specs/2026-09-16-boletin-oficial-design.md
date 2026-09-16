@@ -2,7 +2,7 @@
 
 ## Estado
 
-Draft v0.4 — 2026-09-16
+Draft v0.5 — 2026-09-16
 
 ## Contexto
 
@@ -161,6 +161,7 @@ Modelo de embeddings: para el MVP se usará `Qwen/Qwen3-Embedding-0.6B` (self-ho
 - `boletin_id`
 - `posicion`
 - `texto`
+- `fecha_publicacion` — denormalizada desde `boletines`; la exige REQ-05 y evita un join en el filtro de fecha de REQ-09
 - `embedding`
 - `metadata`
 - `created_at`
