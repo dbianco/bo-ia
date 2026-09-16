@@ -1,6 +1,5 @@
 """T023: endpoint de ingesta — orquesta ingestor + fragmentador + embeddings
 (FR-001 a FR-007)."""
-import datetime
 
 import pytest
 from fastapi.testclient import TestClient

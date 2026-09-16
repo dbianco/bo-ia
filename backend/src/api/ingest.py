@@ -97,14 +97,14 @@ def ingerir_endpoint(
             )
         boletin.estado_ingesta = "completo"
         session.commit()
-    except Exception:
+    except Exception as exc:
         session.rollback()  # descarta fragmentos parcialmente insertados
         boletin.estado_ingesta = "error"
         session.commit()  # FR-006: el error queda registrado sin perder el boletín
         raise HTTPException(
             status_code=500,
             detail="Error al fragmentar o generar embeddings; el boletín quedó registrado con estado 'error'.",
-        )
+        ) from exc
 
     return BoletinSalida(
         boletin_id=boletin.id,

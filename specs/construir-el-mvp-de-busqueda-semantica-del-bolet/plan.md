@@ -20,36 +20,52 @@ Fuente: `spec.md` de esta feature y `docs/superpowers/specs/2026-09-16-boletin-o
 - **Migraciones de esquema reversibles con rollback probado:** el esquema (`boletines`, `fragmentos`, `tags`, `fragmento_tags`, `valoraciones`) se gestiona con Alembic, con una migración `down` probada por cada `up`, desde el primer commit del esquema.
 - **Cambios de API pública aditivos dentro de una versión mayor:** la API interna arranca versionada bajo `/v1/...` desde el día uno, aunque todavía no tiene consumidores externos, para no tener que introducir versionado más tarde cuando llegue el cliente MCP de la Etapa 4.
 - **Secretos desde el entorno, nunca desde el código:** credenciales de Postgres y cualquier credencial futura del feed de ingesta viven en `.env` (ignorado por git), con `.env.example` documentando las claves requeridas, tal como ya define la sección 15 del design spec.
-- **Tests en CI antes de mergear, build roja bloquea el merge:** la suite de pytest queda documentada como chequeo obligatorio; falta el workflow de CI en sí, que queda anotado como tarea pendiente para la fase `tasks`.
+- **Tests en CI antes de mergear, build roja bloquea el merge:** `.github/workflows/ci.yml` corre lint (ruff) y la suite de pytest en cada push/PR a `main`, más un smoke test de Docker en un job aparte; verificado con corridas reales en GitHub Actions.
 - **Accesibilidad, controles alcanzables por teclado y etiquetados:** el formulario de búsqueda, los filtros de fecha y los íconos de pulgar arriba/abajo se implementan con controles HTML semánticos nativos (`<button>`, `<input>`, `<label>`), operables por teclado por defecto, verificado manualmente antes de dar por cerrado el MVP.
 
 ## Project Structure
+
+Árbol final real (actualizado tras la fase `implement` y el follow-on de búsqueda híbrida; ver `verify-evidence.md` para el detalle de qué se verificó de cada pieza):
 
 ```
 bo-ia/
 ├── `docker-compose.yml`
 ├── `.env.example`
+├── `.dockerignore`
+├── `.github/workflows/ci.yml`         # lint + tests + smoke test de Docker
 ├── `backend/`
 │   ├── `Dockerfile`
-│   ├── `pyproject.toml`
+│   ├── `entrypoint.sh`                # alembic upgrade head antes de uvicorn
+│   ├── `pyproject.toml`               # deps + config de ruff y pytest
+│   ├── `alembic.ini`
 │   ├── `src/`
-│   │   ├── `ingestor/`            # FR-001–007: validación, hash, fragmentación
-│   │   ├── `processor/`           # embeddings (Qwen3-Embedding-0.6B), hook de tagging futuro
-│   │   ├── `api/`                 # FastAPI: endpoints de búsqueda, ingesta y valoraciones
+│   │   ├── `ingestor/`
+│   │   │   ├── `ingest.py`            # FR-001–003, FR-006: validación, hash, idempotencia
+│   │   │   └── `fragmenter.py`        # FR-004–005, FR-007: fragmentación con solapamiento
+│   │   ├── `processor/`
+│   │   │   ├── `embeddings.py`        # Qwen3-Embedding-0.6B (real) + fake (tests)
+│   │   │   ├── `threshold.py`         # FR-015: umbral de similitud
+│   │   │   └── `hybrid.py`            # FR-028–029: fusión RRF (texto + vector)
+│   │   ├── `api/`
+│   │   │   ├── `main.py`, `deps.py`
+│   │   │   ├── `search.py`            # FR-008–013, FR-015, FR-026–031: modos SEMANTIC/HYBRID/ALL
+│   │   │   ├── `ingest.py`            # POST /v1/boletines
+│   │   │   └── `feedback.py`          # FR-014: POST /v1/valoraciones
 │   │   ├── `db/`
-│   │   │   ├── `models.py`        # boletines, fragmentos, tags, fragmento_tags, valoraciones
-│   │   │   └── `migrations/`      # Alembic
+│   │   │   ├── `models.py`            # boletines, fragmentos (+ texto_tsv), tags, fragmento_tags, valoraciones
+│   │   │   └── `migrations/`          # Alembic, 5 revisiones
 │   │   └── `seed/`
-│   │       └── `sample_boletines.json`  # FR-017
-│   └── `tests/`
+│   │       ├── `sample_boletines.json`  # FR-017
+│   │       └── `seed.py`
+│   └── `tests/`                       # unit, api, smoke, manual (accesibilidad)
 ├── `web/`
-│   ├── `Dockerfile`
-│   ├── `templates/`               # Jinja2: búsqueda, resultados, pulgares
-│   └── `static/`
+│   ├── `Dockerfile`, `app.py`
+│   ├── `templates/`                   # search.html, _resultados.html, _gracias.html
+│   └── `static/`                      # htmx.min.js (vendorizado), style.css
 ├── `specs/construir-el-mvp-de-busqueda-semantica-del-bolet/`
-│   ├── `spec.md`
-│   └── `plan.md`
-└── `docs/superpowers/specs/2026-09-16-boletin-oficial-design.md`  # design spec de referencia
+│   ├── `spec.md`, `plan.md`, `tasks.md`
+│   └── `verify-evidence.md`
+└── `docs/superpowers/specs/2026-09-16-boletin-oficial-design.md`  # design spec de referencia (v0.6)
 ```
 
 ## Research

@@ -52,7 +52,7 @@ class Boletin(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    fragmentos: Mapped[list["Fragmento"]] = relationship(
+    fragmentos: Mapped[list[Fragmento]] = relationship(
         back_populates="boletin", cascade="all, delete-orphan"
     )
 
@@ -85,9 +85,9 @@ class Fragmento(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    boletin: Mapped["Boletin"] = relationship(back_populates="fragmentos")
-    tags: Mapped[list["FragmentoTag"]] = relationship(back_populates="fragmento", cascade="all, delete-orphan")
-    valoraciones: Mapped[list["Valoracion"]] = relationship(
+    boletin: Mapped[Boletin] = relationship(back_populates="fragmentos")
+    tags: Mapped[list[FragmentoTag]] = relationship(back_populates="fragmento", cascade="all, delete-orphan")
+    valoraciones: Mapped[list[Valoracion]] = relationship(
         back_populates="fragmento", cascade="all, delete-orphan"
     )
 
@@ -129,8 +129,8 @@ class FragmentoTag(Base):
     modelo_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     revisado_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    fragmento: Mapped["Fragmento"] = relationship(back_populates="tags")
-    tag: Mapped["Tag"] = relationship()
+    fragmento: Mapped[Fragmento] = relationship(back_populates="tags")
+    tag: Mapped[Tag] = relationship()
 
     __table_args__ = (
         CheckConstraint(f"origen IN {ORIGENES_TAG}", name="ck_fragmento_tag_origen"),
@@ -152,7 +152,7 @@ class Valoracion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    fragmento: Mapped["Fragmento"] = relationship(back_populates="valoraciones")
+    fragmento: Mapped[Fragmento] = relationship(back_populates="valoraciones")
 
     __table_args__ = (
         CheckConstraint(f"valor IN {VALORES_FEEDBACK}", name="ck_valoracion_valor"),

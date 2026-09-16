@@ -26,9 +26,33 @@ Cruza cada escenario de aceptación y criterio de éxito de `spec.md` contra la 
 | SC-005: ≥80% evaluación manual positiva | ⏳ pendiente | Requiere consultas representativas contra datos reales; el corpus actual es de ejemplo/ficticio (ver pregunta abierta 1 del design spec sobre el feed real). No se puede evaluar todavía de forma significativa. |
 | SC-006: entorno Docker arranca sano en macOS y Windows | ⚠️ parcial | Igual que el escenario 6: verificado en macOS, Windows pendiente |
 
+## Trazabilidad FR → test (spec.md)
+
+| FR | Cubierto por |
+|---|---|
+| FR-001, FR-002, FR-003 | `tests/ingestor/test_ingestor.py` |
+| FR-004, FR-005, FR-007 | `tests/ingestor/test_fragmenter.py`; `tests/api/test_ingest.py::test_ingerir_boletin_crea_fragmentos_con_embeddings` |
+| FR-006 | `tests/api/test_ingest.py::test_error_de_procesamiento_no_pierde_el_boletin_ya_recibido` |
+| FR-008, FR-009, FR-010, FR-011, FR-013 | `tests/api/test_search.py` |
+| FR-012, FR-015 | `tests/api/test_search.py::test_busqueda_sin_resultados_confiables_devuelve_lista_vacia`; `tests/processor/test_embeddings.py` (umbral); `tests/api/test_search_hybrid.py` (umbral por modo) |
+| FR-014 | `tests/api/test_feedback.py` |
+| FR-016, FR-017 | `tests/smoke/test_docker_up.py` |
+
+(FR-018 a FR-031 no están en `spec.md` de esta feature — se agregaron directamente al design spec como REQ-26 a REQ-31 en el follow-on de búsqueda híbrida, sin reabrir el `spec.md` ya verificado. Ver `tests/processor/test_hybrid.py` y `tests/api/test_search_hybrid.py`.)
+
+## Checklist de la fase `verify` (lint, seguridad, tests)
+
+- **Lint (ruff):** agregado en este paso (no existía antes). `ruff check src tests` → 47 hallazgos iniciales, 44 corregidos (auto-fix + 3 a mano: excepción sin `from` dentro de un `except`, `StrEnum` en vez de `class(str, Enum)`, variable de loop sin usar), 3 ignorados a propósito y documentados en `pyproject.toml` (`B008` es el patrón estándar de `Depends()`/`Query()` de FastAPI; `UP047` es TypeVar clásico, válido). **Resultado: 0 hallazgos.**
+- **Seguridad — dependencias (`pip-audit`):** 10 vulnerabilidades reales en 2 paquetes.
+  - `pytest` 8.4.2 (PYSEC-2026-1845): **corregido**, subido a 9.1.1 (se sacó `pytest-asyncio`, que nunca se usaba y bloqueaba el upgrade por su pin `pytest<9`). 45/45 tests siguen en verde.
+  - `transformers` 4.57.6 (5 CVEs, entre ellas RCE vía `Trainer._load_rng_state` sin `weights_only=True`, carga de modelos LightGlue con código arbitrario, y path traversal en `save_pretrained`): **no corregido, riesgo aceptado y documentado.** Arreglarlo de raíz requiere subir `sentence-transformers` de 3.4.1 a 6.x (3 versiones mayores), un cambio grande que no se puede apurar sin una verificación dedicada del pipeline de embeddings real. Se revisó el código propio (`grep` sobre `src/`) y **no se usa ninguna de las rutas vulnerables**: no se usa `Trainer`, no se cargan modelos LightGlue, no se llama `save_pretrained`, y el único modelo cargado es un nombre fijo y confiable (`Qwen/Qwen3-Embedding-0.6B`), nunca un repo controlado por el usuario. Queda como tarea de seguimiento con un camino de arreglo claro.
+- **Seguridad — código (SAST):** se intentó `snyk_code_scan` (Snyk MCP) dos veces; ambas llamadas quedaron colgadas sin respuesta (una falló tras 1800s, la otra se cortó a mano tras 6+ minutos sin progreso — reportado como bug de la herramienta). Como alternativa real: revisión manual de construcción de queries (`grep` confirmó que las únicas dos consultas con input de usuario en `search.py` usan el query builder de SQLAlchemy con parámetros ligados, no interpolación de strings) y de la regla de "secretos desde el entorno" (`.env` nunca commiteado, `DATABASE_URL` siempre viene de una variable de entorno, nunca hardcodeada).
+- **Tests:** 45/45 rápidos + reales en verde (`pytest -m "not docker"`, incluye el modelo real de embeddings), más el smoke test de Docker.
+- **files_changed:** 61 archivos, `git diff --name-only fb1910f..HEAD` (todo el trabajo de esta feature, desde `spec.md` hasta el follow-on de búsqueda híbrida). Ver `plan.md` → Project Structure para el árbol final.
+
 ## Otras verificaciones reales hechas durante `implement`
 
-- **36 tests automatizados en verde** (`pytest -m "not docker"`, incluye el test real contra el modelo `Qwen/Qwen3-Embedding-0.6B`, que efectivamente descarga y genera vectores de 1024 dimensiones).
+- **45 tests automatizados en verde** (`pytest -m "not docker"`, incluye el test real contra el modelo `Qwen/Qwen3-Embedding-0.6B`, que efectivamente descarga y genera vectores de 1024 dimensiones).
 - **1 smoke test de Docker en verde** (`pytest -m docker`): build de las dos imágenes, los tres servicios healthy, búsqueda real funcionando, `docker compose down` limpia todo.
 - **CI en GitHub Actions corrida de verdad** tras el push (no solo el YAML escrito): ver run en el repositorio, job `test` (pytest + modelo real) y job `smoke` (docker compose real).
 - **Migraciones**: `alembic upgrade head` → `alembic check` (sin drift) → `alembic downgrade base` → `alembic upgrade head`, ciclo completo verificado dos veces.

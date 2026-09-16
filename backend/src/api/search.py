@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -32,7 +32,7 @@ CANDIDATOS_MINIMOS = 50
 FACTOR_SOBRE_MUESTREO = 5
 
 
-class ModoBusqueda(str, Enum):
+class ModoBusqueda(StrEnum):
     semantic = "semantic"
     hybrid = "hybrid"
     all = "all"
@@ -142,7 +142,7 @@ def buscar(
 
     umbral = umbral_configurado()
     resultados = []
-    for fid, rrf_score in scores_rrf.items():
+    for fid in scores_rrf:
         en_textual = fid in textuales
         en_vectorial = fid in vectoriales
         similitud = vectoriales[fid][2] if en_vectorial else 0.0
