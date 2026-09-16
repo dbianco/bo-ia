@@ -2,7 +2,7 @@
 
 ## Estado
 
-Draft v0.3 — 2026-09-16
+Draft v0.4 — 2026-09-16
 
 ## Contexto
 
@@ -119,6 +119,11 @@ Accede mediante MCP a resultados acotados, citables y trazables a documentos ofi
 - REQ-21: El servidor MCP debe devolver siempre la URL oficial y la fecha del documento utilizado.
 - REQ-22: El servidor MCP debe limitar el volumen de resultados y evitar acceso irrestricto a la base.
 - REQ-23: Las consultas MCP deben quedar auditadas con herramienta, fecha, parámetros normalizados y cantidad de resultados.
+
+### Entorno de desarrollo
+
+- REQ-24: El MVP debe poder levantarse completo (backend, base de datos e interfaz web) con un solo comando, de forma equivalente en macOS y Windows.
+- REQ-25: El entorno local debe incluir datos de ejemplo para poder probar la búsqueda de punta a punta sin depender de que exista un feed real de ingesta.
 
 ## 6. Arquitectura propuesta
 
@@ -288,4 +293,16 @@ No se requiere una interfaz conversacional en el MVP. La conversación queda par
 ## 14. Criterio de salida del MVP
 
 El MVP estará listo cuando una persona pueda ingresar una consulta en lenguaje natural, acotar un intervalo de fechas, recibir resultados relevantes y verificar cada resultado en el enlace oficial correspondiente, con datos reproducibles y sin autenticación.
+
+## 15. Entorno de desarrollo local (Docker)
+
+El MVP debe poder correr igual en macOS y Windows sin instalar dependencias del lenguaje o de Postgres a mano. Se orquesta con `docker compose` en tres servicios:
+
+- **`db`:** PostgreSQL con la extensión pgvector (por ejemplo `pgvector/pgvector:pg16`). Un volumen nombrado persiste los datos entre reinicios; un script de inicialización crea la extensión y el esquema de la sección 7.
+- **`backend`:** Ingestor, Procesador y API consolidados en un solo servicio Python (ver sección 6). La imagen no incluye el modelo de embeddings; un volumen nombrado aparte cachea `Qwen/Qwen3-Embedding-0.6B` (se descarga la primera vez que arranca el contenedor y persiste en arranques posteriores). Corre en CPU, sin dependencias de GPU.
+- **`web`:** la interfaz de búsqueda de la sección 10, depende de `backend`.
+
+Al arrancar, el `backend` ejecuta un seed idempotente que carga un pequeño conjunto de boletines de ejemplo si la tabla `boletines` está vacía, para que la búsqueda funcione de punta a punta sin depender de un feed real todavía indefinido (ver pregunta abierta 1). El seed no se repite en arranques posteriores si ya hay datos.
+
+Todo el entorno se levanta con un único comando, `docker compose up --build`, igual en las dos plataformas. La configuración (credenciales de desarrollo, puertos) se maneja por variables de entorno, con un `.env.example` versionado en el repositorio.
 
