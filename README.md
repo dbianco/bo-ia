@@ -1,15 +1,27 @@
 # bo-ia
 
+[![CI](https://github.com/dbianco/bo-ia/actions/workflows/ci.yml/badge.svg)](https://github.com/dbianco/bo-ia/actions/workflows/ci.yml)
+
 Plataforma de búsqueda semántica del Boletín Oficial de la Provincia de Córdoba.
 
 ## Documentación
 
 - **Spec de diseño:** [docs/superpowers/specs/2026-09-16-boletin-oficial-design.md](docs/superpowers/specs/2026-09-16-boletin-oficial-design.md) — contexto, alcance por etapas, arquitectura y modelo de datos.
-- **Feature MVP (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — `spec.md`, `plan.md` y `tasks.md` de la Etapa 1.
+- **Feature MVP (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — `spec.md`, `plan.md`, `tasks.md` y `verify-evidence.md` de la Etapa 1.
+- **Checklist de accesibilidad:** [backend/tests/manual/accessibility-checklist.md](backend/tests/manual/accessibility-checklist.md) (WCAG 2.1 AA).
 
 ## Estado actual
 
-El MVP (Etapa 1) está completo según `tasks.md`: ingesta, búsqueda semántica con filtro de fechas, umbral de similitud, valoraciones (pulgar arriba/abajo) y datos de ejemplo precargados, todo corriendo en Docker con un solo comando.
+El MVP (Etapa 1) está completo: las 31 tareas de `tasks.md` implementadas y verificadas con comandos reales (tests, `docker compose` real, CI real en GitHub Actions). La feature está en la fase `verify` del flujo de SDD (spec-kit); ver `verify-evidence.md` para el detalle de qué se verificó y los gaps conocidos (Windows sin probar, tiempo de respuesta sin medición automatizada, evaluación manual pendiente de datos reales).
+
+Endpoints disponibles en el backend (`http://localhost:9101`):
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /v1/search` | Búsqueda semántica (`q`, `date_from`, `date_to`, `limit`) |
+| `POST /v1/boletines` | Ingesta de un boletín (valida, fragmenta, genera embeddings) |
+| `POST /v1/valoraciones` | Registra un pulgar arriba/abajo sobre un resultado |
+| `GET /health` | Chequeo de salud |
 
 ## Estructura del repositorio
 
