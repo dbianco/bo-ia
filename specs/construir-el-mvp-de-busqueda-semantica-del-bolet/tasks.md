@@ -10,12 +10,12 @@ Orden: toda dependencia aparece antes que la tarea que depende de ella. `[P]` ma
 
 ### Setup
 
-- [ ] T001 Inicializar el proyecto Python del backend (dependencias: fastapi, sqlalchemy, psycopg, pgvector, sentence-transformers, alembic, pytest) en `backend/pyproject.toml`
-- [ ] T002 [P] Escribir `.env.example` con las variables de entorno requeridas (credenciales de Postgres, puertos, ruta de caché del modelo) en `.env.example`
-- [ ] T003 Escribir `docker-compose.yml` definiendo los servicios `db`, `backend` y `web` con volúmenes nombrados para los datos de Postgres y la caché del modelo de embeddings, depends on T001, depends on T002
-- [ ] T004 [P] Escribir `backend/Dockerfile` (base Python 3.12, CPU-only, instala desde `pyproject.toml`), depends on T001
-- [ ] T005 [P] Escribir `web/Dockerfile` (sirve la app Jinja2/htmx), depends on T001
-- [ ] T006 [P] Inicializar Alembic en `backend/src/db/migrations/`, depends on T001
+- [x] T001 Inicializar el proyecto Python del backend (dependencias: fastapi, sqlalchemy, psycopg, pgvector, sentence-transformers, alembic, pytest) en `backend/pyproject.toml`
+- [x] T002 [P] Escribir `.env.example` con las variables de entorno requeridas (credenciales de Postgres, puertos, ruta de caché del modelo) en `.env.example`
+- [x] T003 Escribir `docker-compose.yml` definiendo los servicios `db`, `backend` y `web` con volúmenes nombrados para los datos de Postgres y la caché del modelo de embeddings, depends on T001, depends on T002
+- [x] T004 [P] Escribir `backend/Dockerfile` (base Python 3.12, CPU-only, instala desde `pyproject.toml`), depends on T001
+- [x] T005 [P] Escribir `web/Dockerfile` (sirve la app Jinja2/htmx), depends on T001
+- [x] T006 [P] Inicializar Alembic en `backend/src/db/migrations/`, depends on T001
 
 ### Modelo de datos
 
