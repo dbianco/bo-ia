@@ -25,48 +25,69 @@ Fuente: `spec.md` de esta feature y `docs/superpowers/specs/2026-09-16-boletin-o
 
 ## Project Structure
 
-Árbol final real (actualizado tras la fase `implement` y el follow-on de búsqueda híbrida; ver `verify-evidence.md` para el detalle de qué se verificó de cada pieza):
+Lista final real y completa (actualizada tras `implement` y el follow-on de búsqueda híbrida; ver `verify-evidence.md` para el detalle de qué se verificó de cada pieza). Un archivo por línea, para que el chequeo `scope_drift` matchee exacto:
 
-```
-bo-ia/
-├── `docker-compose.yml`
-├── `.env.example`
-├── `.dockerignore`
-├── `.github/workflows/ci.yml`         # lint + tests + smoke test de Docker
-├── `backend/`
-│   ├── `Dockerfile`
-│   ├── `entrypoint.sh`                # alembic upgrade head antes de uvicorn
-│   ├── `pyproject.toml`               # deps + config de ruff y pytest
-│   ├── `alembic.ini`
-│   ├── `src/`
-│   │   ├── `ingestor/`
-│   │   │   ├── `ingest.py`            # FR-001–003, FR-006: validación, hash, idempotencia
-│   │   │   └── `fragmenter.py`        # FR-004–005, FR-007: fragmentación con solapamiento
-│   │   ├── `processor/`
-│   │   │   ├── `embeddings.py`        # Qwen3-Embedding-0.6B (real) + fake (tests)
-│   │   │   ├── `threshold.py`         # FR-015: umbral de similitud
-│   │   │   └── `hybrid.py`            # FR-028–029: fusión RRF (texto + vector)
-│   │   ├── `api/`
-│   │   │   ├── `main.py`, `deps.py`
-│   │   │   ├── `search.py`            # FR-008–013, FR-015, FR-026–031: modos SEMANTIC/HYBRID/ALL
-│   │   │   ├── `ingest.py`            # POST /v1/boletines
-│   │   │   └── `feedback.py`          # FR-014: POST /v1/valoraciones
-│   │   ├── `db/`
-│   │   │   ├── `models.py`            # boletines, fragmentos (+ texto_tsv), tags, fragmento_tags, valoraciones
-│   │   │   └── `migrations/`          # Alembic, 5 revisiones
-│   │   └── `seed/`
-│   │       ├── `sample_boletines.json`  # FR-017
-│   │       └── `seed.py`
-│   └── `tests/`                       # unit, api, smoke, manual (accesibilidad)
-├── `web/`
-│   ├── `Dockerfile`, `app.py`
-│   ├── `templates/`                   # search.html, _resultados.html, _gracias.html
-│   └── `static/`                      # htmx.min.js (vendorizado), style.css
-├── `specs/construir-el-mvp-de-busqueda-semantica-del-bolet/`
-│   ├── `spec.md`, `plan.md`, `tasks.md`
-│   └── `verify-evidence.md`
-└── `docs/superpowers/specs/2026-09-16-boletin-oficial-design.md`  # design spec de referencia (v0.6)
-```
+- `.dockerignore`
+- `.env.example`
+- `.gitignore`
+- `README.md`
+- `docker-compose.yml`
+- `.github/workflows/ci.yml`
+- `docs/superpowers/specs/2026-09-16-boletin-oficial-design.md`
+- `backend/Dockerfile`
+- `backend/alembic.ini`
+- `backend/entrypoint.sh`
+- `backend/pyproject.toml`
+- `backend/src/__init__.py`
+- `backend/src/api/__init__.py`
+- `backend/src/api/deps.py`
+- `backend/src/api/feedback.py`
+- `backend/src/api/ingest.py`
+- `backend/src/api/main.py`
+- `backend/src/api/search.py`
+- `backend/src/db/__init__.py`
+- `backend/src/db/migrations/README`
+- `backend/src/db/migrations/env.py`
+- `backend/src/db/migrations/script.py.mako`
+- `backend/src/db/migrations/versions/113ce16dc179_enable_pgvector_and_create_boletines.py`
+- `backend/src/db/migrations/versions/20e22678f33f_create_tags_and_fragmento_tags.py`
+- `backend/src/db/migrations/versions/7b248b8b4274_create_valoraciones.py`
+- `backend/src/db/migrations/versions/9aaa3783a1df_add_fragmentos_texto_tsv_fulltext_search.py`
+- `backend/src/db/migrations/versions/fa9cc1623dda_create_fragmentos.py`
+- `backend/src/db/models.py`
+- `backend/src/ingestor/__init__.py`
+- `backend/src/ingestor/fragmenter.py`
+- `backend/src/ingestor/ingest.py`
+- `backend/src/processor/__init__.py`
+- `backend/src/processor/embeddings.py`
+- `backend/src/processor/hybrid.py`
+- `backend/src/processor/threshold.py`
+- `backend/src/seed/sample_boletines.json`
+- `backend/src/seed/seed.py`
+- `backend/tests/__init__.py`
+- `backend/tests/api/test_feedback.py`
+- `backend/tests/api/test_ingest.py`
+- `backend/tests/api/test_search.py`
+- `backend/tests/api/test_search_hybrid.py`
+- `backend/tests/conftest.py`
+- `backend/tests/ingestor/test_fragmenter.py`
+- `backend/tests/ingestor/test_ingestor.py`
+- `backend/tests/manual/accessibility-checklist.md`
+- `backend/tests/processor/test_embeddings.py`
+- `backend/tests/processor/test_hybrid.py`
+- `backend/tests/smoke/test_docker_up.py`
+- `backend/tests/test_migrations.py`
+- `web/Dockerfile`
+- `web/app.py`
+- `web/static/htmx.min.js`
+- `web/static/style.css`
+- `web/templates/_gracias.html`
+- `web/templates/_resultados.html`
+- `web/templates/search.html`
+- `specs/construir-el-mvp-de-busqueda-semantica-del-bolet/spec.md`
+- `specs/construir-el-mvp-de-busqueda-semantica-del-bolet/plan.md`
+- `specs/construir-el-mvp-de-busqueda-semantica-del-bolet/tasks.md`
+- `specs/construir-el-mvp-de-busqueda-semantica-del-bolet/verify-evidence.md`
 
 ## Research
 
