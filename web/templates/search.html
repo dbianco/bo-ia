@@ -4,13 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Boletín Oficial de Córdoba — Búsqueda semántica</title>
+  <script>
+    (function () {
+      var tema = "dark";
+      try {
+        if (localStorage.getItem("tema") === "light") tema = "light";
+      } catch (e) {}
+      document.documentElement.setAttribute("data-theme", tema);
+    })();
+  </script>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js"></script>
 </head>
 <body>
   <main>
-    <h1>Boletín Oficial de Córdoba</h1>
-    <p class="subtitulo">Búsqueda semántica sobre boletines oficiales (MVP).</p>
+    <div class="encabezado">
+      <div>
+        <h1>Boletín Oficial de Córdoba</h1>
+        <p class="subtitulo">Búsqueda semántica sobre boletines oficiales (MVP).</p>
+      </div>
+      <button
+        type="button"
+        id="theme-toggle"
+        class="theme-toggle"
+        aria-pressed="false"
+        aria-label="Cambiar a tema claro"
+      >🌙</button>
+    </div>
 
     <form role="search" hx-get="/resultados" hx-target="#resultados" hx-indicator="#buscando">
       <div>
@@ -41,5 +61,6 @@
 
     <section id="resultados" aria-live="polite"></section>
   </main>
+  <script src="/static/theme.js"></script>
 </body>
 </html>
