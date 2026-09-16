@@ -52,7 +52,7 @@ Orden: toda dependencia aparece antes que la tarea que depende de ella. `[P]` ma
 
 ### Pulido y verificación
 
-- [ ] T028 Escribir el workflow de CI que corre pytest en cada push y pull request en `.github/workflows/ci.yml`, depends on T012, depends on T013, depends on T014, depends on T015, depends on T016, depends on T017
-- [ ] T029 [P] Escribir una checklist manual de accesibilidad (navegación por teclado, controles etiquetados) para la página de búsqueda contra WCAG 2.1 AA en `backend/tests/manual/accessibility-checklist.md`, depends on T026, depends on T027
-- [ ] T030 Actualizar `README.md` con instrucciones de arranque (`docker compose up --build`, datos de seed, cómo correr los tests) en `README.md`, depends on T003, depends on T025, depends on T028
+- [x] T028 Escribir el workflow de CI que corre pytest en cada push y pull request en `.github/workflows/ci.yml`, depends on T012, depends on T013, depends on T014, depends on T015, depends on T016, depends on T017
+- [x] T029 [P] Escribir una checklist manual de accesibilidad (navegación por teclado, controles etiquetados) para la página de búsqueda contra WCAG 2.1 AA en `backend/tests/manual/accessibility-checklist.md`, depends on T026, depends on T027
+- [x] T030 Actualizar `README.md` con instrucciones de arranque (`docker compose up --build`, datos de seed, cómo correr los tests) en `README.md`, depends on T003, depends on T025, depends on T028
 - [ ] T031 Correr la suite completa de tests y el smoke test, confirmar que cada escenario de aceptación y criterio de éxito de `spec.md` se cumple, y registrar los resultados como evidencia para la fase `verify`, depends on T022, depends on T023, depends on T024, depends on T025, depends on T026, depends on T027, depends on T028, depends on T029, depends on T030

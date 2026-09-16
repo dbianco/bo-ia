@@ -9,11 +9,11 @@ Plataforma de búsqueda semántica del Boletín Oficial de la Provincia de Córd
 
 ## Estado actual
 
-El MVP (Etapa 1) está en implementación, siguiendo las tareas de `tasks.md`. El entorno de Docker ya levanta (`db`, `backend`, `web` healthy), pero todavía no tiene los endpoints de ingesta/búsqueda ni los datos de ejemplo (tareas T007 en adelante).
+El MVP (Etapa 1) está completo según `tasks.md`: ingesta, búsqueda semántica con filtro de fechas, umbral de similitud, valoraciones (pulgar arriba/abajo) y datos de ejemplo precargados, todo corriendo en Docker con un solo comando.
 
 ## Estructura del repositorio
 
-- `backend/` — Ingestor, Procesador y API (Python/FastAPI), consolidados en un solo servicio.
+- `backend/` — Ingestor, Procesador y API (Python/FastAPI), consolidados en un solo servicio. Ver `backend/src/` (código) y `backend/tests/` (tests).
 - `web/` — interfaz de búsqueda (Jinja2 + htmx).
 - `specs/` — artefactos del framework spec-kit (spec, plan, tareas) para el flujo de fases del SDD.
 - `docs/` — spec de diseño original y documentación de referencia.
@@ -29,11 +29,27 @@ docker compose up --build
 
 Esto levanta tres servicios: `db` (PostgreSQL + pgvector, puerto 9100), `backend` (Ingestor + Procesador + API, puerto 9101) y `web` (interfaz de búsqueda, puerto 9102). Los puertos están en el rango 9100 para evitar choques con otras apps corriendo en la máquina.
 
-Por ahora los servicios solo exponen un chequeo de salud, mientras se completan los endpoints reales:
+Al arrancar, el backend corre las migraciones de Alembic automáticamente y carga un puñado de boletines de ejemplo si la base está vacía. La primera vez descarga el modelo de embeddings (`Qwen/Qwen3-Embedding-0.6B`, ~1 GB) y lo cachea en un volumen; los arranques siguientes son instantáneos.
+
+Abrí `http://localhost:9102` para usar la interfaz, o probá la API directamente:
 
 ```bash
-curl http://localhost:9101/health   # backend
-curl http://localhost:9102/health   # web
+curl http://localhost:9101/health
+curl "http://localhost:9101/v1/search?q=presupuesto+provincial"
 ```
 
-La búsqueda de punta a punta (con datos de ejemplo precargados) queda disponible cuando se completen las tareas de `tasks.md` hasta T025.
+## Cómo correr los tests
+
+Con Python 3.12 y el servicio `db` levantado (`docker compose up -d db`):
+
+```bash
+cd backend
+python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+export DATABASE_URL="postgresql+psycopg://bo_ia:dev_only_change_me@localhost:9100/bo_ia"
+
+.venv/bin/pytest -m "not slow and not docker"   # rápidos, con embeddings fake
+.venv/bin/pytest -m slow                        # descarga y usa el modelo real (~1 GB)
+.venv/bin/pytest -m docker                      # smoke test: levanta todo con docker compose
+```
+
+El workflow de CI (`.github/workflows/ci.yml`) corre los dos primeros grupos en un job y el smoke test en otro, en cada push y pull request a `main`.
