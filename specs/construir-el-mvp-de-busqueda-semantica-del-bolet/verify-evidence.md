@@ -38,10 +38,17 @@ Cruza cada escenario de aceptación y criterio de éxito de `spec.md` contra la 
 - **Bug real encontrado en la primera corrida de CI en GitHub Actions**: el job `smoke` fallaba porque nunca corría `cp .env.example .env` (ese archivo está en `.gitignore` y no llega al runner). Sin él, `docker-compose.yml` no tenía valores para ninguna variable sin default explícito, y el volumen `model-cache:${EMBEDDING_CACHE_DIR}` se volvía inválido (`model-cache:`, ruta vacía). Se agregó el paso al workflow. Esto pasó inadvertido en las corridas locales porque el `.env` ya existía en la máquina de desarrollo desde el bloque de Setup.
 - **Inconsistencia real encontrada y corregida en el spec de diseño**: REQ-05 exigía `fecha_publicacion` en `fragmentos`, pero la sección 7 no la listaba. Se corrigió el spec (v0.5) y el esquema real coincide.
 
+## Hallazgos de uso manual (post-verify)
+
+Encontrados usando el MVP ya verificado, con el corpus de 6 boletines de ejemplo. Son evidencia directa de por qué SC-005 (evaluación manual con datos reales) sigue pendiente: un corpus tan chico hace visibles tanto falsos negativos como falsos positivos que un corpus real diluiría.
+
+1. **"salud" no encontraba los 2 boletines que la contienen literalmente** (similitud 0.41-0.45, por debajo del umbral 0.5 de REQ-15). **Resuelto**: se agregaron los modos HYBRID/ALL (REQ-26 a REQ-29, v0.6 del design spec) — una coincidencia de texto exacto rescata el resultado en HYBRID. Verificado con `curl` real contra los 3 modos.
+2. **Consulta compuesta "calendarios propuestos por el ministerio de salud" devuelve `BO-DEMO-0004`** (calendario escolar, nada que ver con salud) con similitud 0.5017, apenas sobre el umbral. **Sin resolver, documentado a propósito**: no es un bug de código — `coincidencia_texto=False` en los 3 modos, confirma que es el vector puro. La búsqueda semántica mide similitud global entre consulta y texto, no exige que todos los conceptos de una consulta compuesta coincidan a la vez; con solo 6 documentos, un match parcial en "calendario" alcanza para superar el umbral. Es muy probable que sea mucho menos frecuente con un corpus real más grande. Decisión: no tocar el umbral ni agregar lógica de "AND" entre conceptos todavía, esperar a tener datos reales para calibrar con evidencia real en vez de reaccionar a un caso de un corpus de 6 documentos ficticios.
+
 ## Gaps conocidos, sin resolver
 
 1. **Windows no probado de verdad** (escenario 6 / SC-006): el diseño no depende de nada específico del SO host, pero falta la verificación real.
 2. **SC-004 (tiempo de respuesta) sin medición automatizada**: no hay un test de carga/performance en la suite.
-3. **SC-005 (evaluación manual)**: no se puede evaluar de forma significativa hasta tener datos reales del feed de boletines (pregunta abierta 1 del design spec).
+3. **SC-005 (evaluación manual)**: no se puede evaluar de forma significativa hasta tener datos reales del feed de boletines (pregunta abierta 1 del design spec). Los dos hallazgos de la sección anterior son evidencia concreta de esto.
 
-Estos tres gaps no bloquean el avance de fase (el gate `implement → verify` no pide artefactos ni checks), pero quedan documentados para no perderlos de vista antes de dar el MVP por cerrado.
+Estos gaps no bloquean el avance de fase (el gate `implement → verify` no pide artefactos ni checks), pero quedan documentados para no perderlos de vista antes de dar el MVP por cerrado.
