@@ -1,13 +1,37 @@
-"""FastAPI application entrypoint.
+"""FastAPI application entrypoint."""
+import logging
+from contextlib import asynccontextmanager
 
-En esta etapa de Setup (T001-T006) solo expone un health check, para poder
-validar que la imagen Docker construye y arranca correctamente antes de
-implementar los endpoints reales. Los endpoints de búsqueda, ingesta y
-valoraciones se agregan en T022, T023 y T024.
-"""
 from fastapi import FastAPI
+from sqlalchemy.orm import sessionmaker
 
-app = FastAPI(title="bo-ia backend")
+from src.api import deps
+from src.api.deps import get_embedder
+from src.api.feedback import router as feedback_router
+from src.api.ingest import router as ingest_router
+from src.api.search import router as search_router
+from src.seed.seed import sembrar_si_vacio
+
+logger = logging.getLogger("bo-ia")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    session_local = sessionmaker(bind=deps._engine())
+    session = session_local()
+    try:
+        creados = sembrar_si_vacio(session, get_embedder())
+        if creados:
+            logger.info("Seed: %s boletines de ejemplo cargados", creados)
+    finally:
+        session.close()
+    yield
+
+
+app = FastAPI(title="bo-ia backend", lifespan=lifespan)
+app.include_router(search_router)
+app.include_router(feedback_router)
+app.include_router(ingest_router)
 
 
 @app.get("/health")

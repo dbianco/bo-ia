@@ -1,0 +1,33 @@
+{% if resultados %}
+<ul class="resultados-lista">
+  {% for r in resultados %}
+  <li class="resultado">
+    <p class="resultado-fecha">{{ r.fecha_publicacion }} — {{ r.identificador_oficial }}</p>
+    <p class="resultado-texto">{{ r.texto }}</p>
+    <a href="{{ r.url_oficial }}" target="_blank" rel="noopener">Ver boletín oficial</a>
+    <div class="resultado-valoracion" id="valoracion-{{ r.fragmento_id }}">
+      <button
+        type="button"
+        class="boton-valoracion"
+        aria-label="Marcar este resultado como útil"
+        hx-post="/valorar"
+        hx-vals='{"fragmento_id": "{{ r.fragmento_id }}", "consulta": "{{ consulta }}", "valor": "positivo"}'
+        hx-target="#valoracion-{{ r.fragmento_id }}"
+        hx-swap="outerHTML"
+      >👍</button>
+      <button
+        type="button"
+        class="boton-valoracion"
+        aria-label="Marcar este resultado como no útil"
+        hx-post="/valorar"
+        hx-vals='{"fragmento_id": "{{ r.fragmento_id }}", "consulta": "{{ consulta }}", "valor": "negativo"}'
+        hx-target="#valoracion-{{ r.fragmento_id }}"
+        hx-swap="outerHTML"
+      >👎</button>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p role="status">No encontramos resultados confiables para esta consulta.</p>
+{% endif %}

@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN pip install "fastapi>=0.115,<1.0" "uvicorn[standard]>=0.32,<1.0" "jinja2>=3.1,<4.0" "httpx>=0.27,<1.0"
+RUN pip install "fastapi>=0.115,<1.0" "uvicorn[standard]>=0.32,<1.0" "jinja2>=3.1,<4.0" "httpx>=0.27,<1.0" "python-multipart>=0.0.12,<1.0"
 
 COPY app.py ./
 COPY templates ./templates

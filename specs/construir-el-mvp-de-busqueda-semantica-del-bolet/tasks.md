@@ -27,28 +27,28 @@ Orden: toda dependencia aparece antes que la tarea que depende de ella. `[P]` ma
 
 ### Tests primero (TDD)
 
-- [ ] T012 [P] Escribir tests que fallen para validación de ingesta, idempotencia y conservación del contenido original (FR-001, FR-002, FR-003, FR-006) en `backend/tests/ingestor/test_ingestor.py`, depends on T008
-- [ ] T013 [P] Escribir tests que fallen para fragmentación y la garantía de al menos un fragmento (FR-004, FR-005, FR-007) en `backend/tests/ingestor/test_fragmenter.py`, depends on T008
-- [ ] T014 [P] Escribir tests que fallen para generación de embeddings y el filtro de umbral de similitud (FR-015) en `backend/tests/processor/test_embeddings.py`, depends on T008
-- [ ] T015 [P] Escribir tests que fallen para el endpoint de búsqueda: consulta en lenguaje natural, filtros de fecha, orden por relevancia, límite de resultados, metadatos de cita, lista vacía cuando no hay resultados confiables (FR-008, FR-009, FR-010, FR-011, FR-012, FR-013) en `backend/tests/api/test_search.py`, depends on T008
-- [ ] T016 [P] Escribir tests que fallen para el endpoint de valoraciones (pulgar arriba/abajo) (FR-014) en `backend/tests/api/test_feedback.py`, depends on T010
-- [ ] T017 [P] Escribir un smoke test que falle, que levante `docker compose up` y ejercite la búsqueda contra los datos de ejemplo (FR-016, FR-017, SC-006) en `backend/tests/smoke/test_docker_up.py`, depends on T003
+- [x] T012 [P] Escribir tests que fallen para validación de ingesta, idempotencia y conservación del contenido original (FR-001, FR-002, FR-003, FR-006) en `backend/tests/ingestor/test_ingestor.py`, depends on T008
+- [x] T013 [P] Escribir tests que fallen para fragmentación y la garantía de al menos un fragmento (FR-004, FR-005, FR-007) en `backend/tests/ingestor/test_fragmenter.py`, depends on T008
+- [x] T014 [P] Escribir tests que fallen para generación de embeddings y el filtro de umbral de similitud (FR-015) en `backend/tests/processor/test_embeddings.py`, depends on T008
+- [x] T015 [P] Escribir tests que fallen para el endpoint de búsqueda: consulta en lenguaje natural, filtros de fecha, orden por relevancia, límite de resultados, metadatos de cita, lista vacía cuando no hay resultados confiables (FR-008, FR-009, FR-010, FR-011, FR-012, FR-013) en `backend/tests/api/test_search.py`, depends on T008
+- [x] T016 [P] Escribir tests que fallen para el endpoint de valoraciones (pulgar arriba/abajo) (FR-014) en `backend/tests/api/test_feedback.py`, depends on T010
+- [x] T017 [P] Escribir un smoke test que falle, que levante `docker compose up` y ejercite la búsqueda contra los datos de ejemplo (FR-016, FR-017, SC-006) en `backend/tests/smoke/test_docker_up.py`, depends on T003
 
 ### Implementación
 
-- [ ] T018 [P] Implementar validación de ingesta, hash de contenido e idempotencia en `backend/src/ingestor/ingest.py`, depends on T012
-- [ ] T019 [P] Implementar la fragmentación de texto con tamaño y solapamiento configurables en `backend/src/ingestor/fragmenter.py`, depends on T013
-- [ ] T020 [P] Implementar el proveedor de embeddings que envuelve `Qwen/Qwen3-Embedding-0.6B` vía `sentence-transformers`, con soporte de caché de modelo, en `backend/src/processor/embeddings.py`, depends on T014
-- [ ] T021 Implementar el filtro de umbral de similitud aplicado sobre los resultados ordenados en `backend/src/processor/threshold.py`, depends on T020
-- [ ] T022 Implementar el endpoint de búsqueda (`GET /v1/search`), conectando filtros de fecha, ranking, el filtro de umbral y el límite de resultados, en `backend/src/api/search.py`, depends on T015, depends on T019, depends on T021
-- [ ] T023 Implementar el endpoint de ingesta (`POST /v1/boletines`) en `backend/src/api/ingest.py`, depends on T012, depends on T018, depends on T019
-- [ ] T024 [P] Implementar el endpoint de valoraciones (`POST /v1/valoraciones`) en `backend/src/api/feedback.py`, depends on T016
-- [ ] T025 Escribir el script de seed que carga `backend/src/seed/sample_boletines.json` al primer arranque del backend si `boletines` está vacía, depends on T023
+- [x] T018 [P] Implementar validación de ingesta, hash de contenido e idempotencia en `backend/src/ingestor/ingest.py`, depends on T012
+- [x] T019 [P] Implementar la fragmentación de texto con tamaño y solapamiento configurables en `backend/src/ingestor/fragmenter.py`, depends on T013
+- [x] T020 [P] Implementar el proveedor de embeddings que envuelve `Qwen/Qwen3-Embedding-0.6B` vía `sentence-transformers`, con soporte de caché de modelo, en `backend/src/processor/embeddings.py`, depends on T014
+- [x] T021 Implementar el filtro de umbral de similitud aplicado sobre los resultados ordenados en `backend/src/processor/threshold.py`, depends on T020
+- [x] T022 Implementar el endpoint de búsqueda (`GET /v1/search`), conectando filtros de fecha, ranking, el filtro de umbral y el límite de resultados, en `backend/src/api/search.py`, depends on T015, depends on T019, depends on T021
+- [x] T023 Implementar el endpoint de ingesta (`POST /v1/boletines`) en `backend/src/api/ingest.py`, depends on T012, depends on T018, depends on T019
+- [x] T024 [P] Implementar el endpoint de valoraciones (`POST /v1/valoraciones`) en `backend/src/api/feedback.py`, depends on T016
+- [x] T025 Escribir el script de seed que carga `backend/src/seed/sample_boletines.json` al primer arranque del backend si `boletines` está vacía, depends on T023
 
 ### Interfaz web
 
-- [ ] T026 Implementar la página de búsqueda en Jinja2 (campo de consulta, fecha desde/hasta, lista de resultados) en `web/templates/search.html`, depends on T022
-- [ ] T027 Agregar los controles htmx de pulgar arriba/pulgar abajo en cada resultado, conectados al endpoint de valoraciones, en `web/templates/search.html`, depends on T024, depends on T026
+- [x] T026 Implementar la página de búsqueda en Jinja2 (campo de consulta, fecha desde/hasta, lista de resultados) en `web/templates/search.html`, depends on T022
+- [x] T027 Agregar los controles htmx de pulgar arriba/pulgar abajo en cada resultado, conectados al endpoint de valoraciones, en `web/templates/search.html`, depends on T024, depends on T026
 
 ### Pulido y verificación
 

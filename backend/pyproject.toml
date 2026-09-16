@@ -31,3 +31,7 @@ packages = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "slow: tests que descargan o cargan el modelo real de embeddings (excluidos de la corrida rápida con -m 'not slow')",
+    "docker: smoke tests que levantan el stack completo con docker compose (lentos, requieren Docker)",
+]

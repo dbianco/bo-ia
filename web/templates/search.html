@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boletín Oficial de Córdoba — Búsqueda semántica</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Boletín Oficial de Córdoba</h1>
+    <p class="subtitulo">Búsqueda semántica sobre boletines oficiales (MVP).</p>
+
+    <form role="search" hx-get="/resultados" hx-target="#resultados" hx-indicator="#buscando">
+      <div>
+        <label for="q">Consulta</label>
+        <input type="text" id="q" name="q" required autocomplete="off" placeholder="ej: presupuesto provincial">
+      </div>
+      <div class="form-fechas">
+        <div>
+          <label for="date_from">Desde</label>
+          <input type="date" id="date_from" name="date_from">
+        </div>
+        <div>
+          <label for="date_to">Hasta</label>
+          <input type="date" id="date_to" name="date_to">
+        </div>
+      </div>
+      <button type="submit">Buscar</button>
+      <span id="buscando" class="htmx-indicator" role="status">Buscando…</span>
+    </form>
+
+    <section id="resultados" aria-live="polite"></section>
+  </main>
+</body>
+</html>
