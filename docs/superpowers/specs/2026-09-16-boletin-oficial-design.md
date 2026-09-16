@@ -2,13 +2,15 @@
 
 ## Estado
 
-Draft v0.1 — 2026-09-16
+Draft v0.2 — 2026-09-16
 
 ## Contexto
 
 La plataforma permitirá consultar el contenido del Boletín Oficial de la Provincia de Córdoba mediante búsquedas semánticas y filtros por intervalo de fechas. Cada resultado conservará el texto indexado, la fecha de publicación y el enlace oficial al boletín de origen.
 
 El primer alcance será público y sin autenticación. La arquitectura deberá permitir incorporar posteriormente usuarios, suscripciones por tags, notificaciones personalizadas, otras provincias y un cliente MCP para que herramientas de IA accedan a la información de forma controlada.
+
+Se asume que la ingesta consumirá un feed estructurado de boletines como fuente de datos, no un scraping de una interfaz web (ver no objetivo en sección 3). El formato exacto del feed queda pendiente de definir con la fuente (ver pregunta abierta 1).
 
 ## 1. Objetivo
 
@@ -61,6 +63,7 @@ Construir una fuente institucional consultable que reduzca el costo de encontrar
 - No se entrenará inicialmente un modelo grande de lenguaje propio.
 - No se incorporará una taxonomía compleja hasta contar con ejemplos reales anotados.
 - No se presentará la plataforma como asesoramiento legal ni como fuente sustitutiva del boletín oficial.
+- No se implementará protección contra abuso (rate limiting, cuotas) mientras el MVP corra solo en un entorno de desarrollo.
 
 ## 4. Usuarios
 
@@ -90,29 +93,31 @@ Accede mediante MCP a resultados acotados, citables y trazables a documentos ofi
 - REQ-04: El sistema debe dividir textos extensos en fragmentos con tamaño y solapamiento configurables.
 - REQ-05: Cada fragmento debe conservar el identificador del boletín, posición dentro del documento y fecha de publicación.
 - REQ-06: Un error de procesamiento debe quedar registrado sin perder el documento recibido.
+- REQ-07: El sistema debe garantizar que todo boletín ingerido tenga al menos un fragmento asociado; un boletín sin fragmentos no se considera correctamente ingerido.
 
 ### Búsqueda
 
-- REQ-07: El usuario debe poder buscar mediante una consulta en lenguaje natural.
-- REQ-08: El usuario debe poder indicar fecha desde, fecha hasta o ambas.
-- REQ-09: Los resultados deben ordenarse por relevancia semántica.
-- REQ-10: Cada resultado debe mostrar un fragmento contextual, la fecha y el enlace oficial.
-- REQ-11: El sistema debe informar cuando no encuentra resultados confiables.
-- REQ-12: La API debe permitir limitar la cantidad de resultados y devolver metadatos suficientes para citarlos.
+- REQ-08: El usuario debe poder buscar mediante una consulta en lenguaje natural.
+- REQ-09: El usuario debe poder indicar fecha desde, fecha hasta o ambas.
+- REQ-10: Los resultados deben ordenarse por relevancia semántica.
+- REQ-11: Cada resultado debe mostrar un fragmento contextual, la fecha y el enlace oficial.
+- REQ-12: El sistema debe informar cuando no encuentra resultados confiables.
+- REQ-13: La API debe permitir limitar la cantidad de resultados y devolver metadatos suficientes para citarlos.
+- REQ-14: El usuario debe poder valorar cada resultado como útil o no útil mediante íconos de pulgar arriba / pulgar abajo; la valoración debe quedar asociada a la consulta y al fragmento mostrado.
 
 ### Clasificación
 
-- REQ-13: El modelo de tagging debe soportar múltiples tags por documento o fragmento.
-- REQ-14: Cada predicción debe incluir tag, confianza, versión del modelo y fecha de procesamiento.
-- REQ-15: El sistema debe permitir configurar umbrales por tag.
-- REQ-16: Una predicción de baja confianza no debe convertirse automáticamente en una suscripción activa.
+- REQ-15: El modelo de tagging debe soportar múltiples tags por documento o fragmento.
+- REQ-16: Cada predicción debe incluir tag, confianza, versión del modelo y fecha de procesamiento.
+- REQ-17: El sistema debe permitir configurar umbrales por tag.
+- REQ-18: Una predicción de baja confianza no debe convertirse automáticamente en una suscripción activa.
 
 ### Futuro MCP
 
-- REQ-17: El servidor MCP debe exponer una operación de búsqueda con consulta y filtros de fecha.
-- REQ-18: El servidor MCP debe devolver siempre la URL oficial y la fecha del documento utilizado.
-- REQ-19: El servidor MCP debe limitar el volumen de resultados y evitar acceso irrestricto a la base.
-- REQ-20: Las consultas MCP deben quedar auditadas con herramienta, fecha, parámetros normalizados y cantidad de resultados.
+- REQ-19: El servidor MCP debe exponer una operación de búsqueda con consulta y filtros de fecha.
+- REQ-20: El servidor MCP debe devolver siempre la URL oficial y la fecha del documento utilizado.
+- REQ-21: El servidor MCP debe limitar el volumen de resultados y evitar acceso irrestricto a la base.
+- REQ-22: Las consultas MCP deben quedar auditadas con herramienta, fecha, parámetros normalizados y cantidad de resultados.
 
 ## 6. Arquitectura propuesta
 
@@ -126,6 +131,8 @@ La primera versión debe ser modular, pero mantenerse en pocos componentes:
 6. **Módulo de entrenamiento:** notebook separado para anotación, evaluación y exportación del modelo.
 
 Para el MVP se recomienda PostgreSQL con pgvector, porque permite mantener en un mismo lugar los datos relacionales, los filtros de fecha, la búsqueda textual futura y los embeddings. La búsqueda híbrida —textual más vectorial— queda preparada sin agregar un motor independiente prematuramente.
+
+Modelo de embeddings: para el MVP se usará `Qwen/Qwen3-Embedding-0.6B` (self-hosted, licencia Apache-2.0, ventana de contexto de 32K tokens, buen desempeño multilingüe y en español), compartido entre la búsqueda semántica de la Etapa 1 y el tagging de la Etapa 2, para no mantener dos modelos distintos. El Procesador lo sirve localmente (por ejemplo con `sentence-transformers`), sin agregar un servicio de embeddings separado. Si las métricas de la sección 12 muestran calidad insuficiente, se puede migrar a una variante mayor de la misma familia (4B u 8B) o a `BAAI/bge-m3`, reindexando el corpus.
 
 ## 7. Modelo de datos mínimo
 
@@ -169,6 +176,16 @@ Para el MVP se recomienda PostgreSQL con pgvector, porque permite mantener en un
 - `modelo_version`
 - `revisado_at`
 
+### valoraciones
+
+- `id`
+- `fragmento_id`
+- `consulta`
+- `valor`: `positivo`, `negativo`
+- `created_at`
+
+Los tags a nivel de documento no tienen tabla propia: se derivan de la unión de los tags de sus fragmentos (`fragmento_tags`). Todo boletín debe tener al menos un fragmento generado durante la ingesta (ver REQ-07); un boletín sin fragmentos no se considera correctamente ingerido.
+
 La columna `jurisdiccion` debe existir desde el inicio aunque solo se cargue Córdoba. Evita rediseñar el esquema cuando se incorpore otra provincia.
 
 ## 8. Búsqueda e indexación
@@ -191,7 +208,7 @@ El notebook debe tratar el tagging como clasificación multilabel documental. No
 - Label Studio para anotación y revisión.
 - scikit-learn para el baseline TF-IDF.
 - SetFit para fine-tuning eficiente con pocos ejemplos.
-- `intfloat/multilingual-e5-base` como candidato inicial de embeddings.
+- `Qwen/Qwen3-Embedding-0.6B` como modelo de embeddings (self-hosted), el mismo que se usa para la búsqueda semántica del MVP (ver sección 6).
 - Hugging Face Transformers para una futura comparación con BETO o RoBERTa-BNE.
 
 ### Flujo
@@ -222,7 +239,8 @@ La pantalla inicial debe contener:
 - lista de resultados ordenados por relevancia;
 - fecha e identificador del boletín;
 - fragmento contextual;
-- enlace al documento oficial.
+- enlace al documento oficial;
+- íconos de pulgar arriba / pulgar abajo para valorar cada resultado (ver REQ-14).
 
 No se requiere una interfaz conversacional en el MVP. La conversación queda para el cliente MCP o una etapa posterior, cuando existan métricas suficientes sobre la calidad de recuperación.
 
@@ -235,6 +253,7 @@ No se requiere una interfaz conversacional en el MVP. La conversación queda par
 - La API debe validar tamaño, formato y campos obligatorios en la ingesta.
 - El MCP debe aplicar límites de uso y no permitir consultas administrativas.
 - Deben registrarse versiones de embeddings, modelos y taxonomías.
+- La protección contra abuso (límites de uso, cuotas) de la API pública queda diferida mientras el MVP corra solo en un entorno de desarrollo; debe implementarse antes de exponer el sistema fuera de ese entorno.
 
 ## 12. Métricas de éxito
 
@@ -254,7 +273,7 @@ No se requiere una interfaz conversacional en el MVP. La conversación queda par
 
 ## 13. Preguntas abiertas
 
-1. ¿Cuál será el formato exacto de entrada de los textos y metadatos?
+1. ¿Cuál será el formato exacto del feed estructurado de entrada (esquema de campos, protocolo de entrega)?
 2. ¿Qué volumen histórico inicial de boletines estará disponible?
 3. ¿Cuál será la frecuencia de incorporación de nuevos boletines?
 4. ¿Quién revisará la calidad de los datos y las predicciones?
