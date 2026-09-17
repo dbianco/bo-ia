@@ -40,21 +40,36 @@
       <div class="form-fechas">
         <div>
           <label for="date_from">Desde</label>
-          <input type="date" id="date_from" name="date_from">
+          <div class="campo-fecha">
+            <input type="date" id="date_from" name="date_from">
+            <button type="button" class="borrar-fecha" data-target="date_from" aria-label="Borrar fecha desde" hidden>×</button>
+          </div>
         </div>
         <div>
           <label for="date_to">Hasta</label>
-          <input type="date" id="date_to" name="date_to">
+          <div class="campo-fecha">
+            <input type="date" id="date_to" name="date_to">
+            <button type="button" class="borrar-fecha" data-target="date_to" aria-label="Borrar fecha hasta" hidden>×</button>
+          </div>
         </div>
       </div>
-      <div>
-        <label for="mode">Modo de búsqueda</label>
-        <select id="mode" name="mode">
-          <option value="semantic" selected>Semántica (default)</option>
-          <option value="hybrid">Híbrida (semántica + texto exacto)</option>
-          <option value="all">Todo (sin filtrar por confianza)</option>
-        </select>
-      </div>
+      <fieldset class="modo-busqueda">
+        <legend>Modo de búsqueda</legend>
+        <div class="opciones-modo">
+          <label class="opcion-modo" title="Busca por significado, aunque no coincidan las palabras exactas.">
+            <input type="radio" name="mode" value="semantic" checked>
+            <span>Semántica</span>
+          </label>
+          <label class="opcion-modo" title="Semántica combinada con coincidencia de texto exacto.">
+            <input type="radio" name="mode" value="hybrid">
+            <span>Híbrida</span>
+          </label>
+          <label class="opcion-modo" title="Todos los resultados, sin filtrar por confianza.">
+            <input type="radio" name="mode" value="all">
+            <span>Todo</span>
+          </label>
+        </div>
+      </fieldset>
       <button type="submit">Buscar</button>
       <span id="buscando" class="htmx-indicator" role="status">Buscando…</span>
     </form>
@@ -62,5 +77,6 @@
     <section id="resultados" aria-live="polite"></section>
   </main>
   <script src="/static/theme.js"></script>
+  <script src="/static/fechas.js"></script>
 </body>
 </html>

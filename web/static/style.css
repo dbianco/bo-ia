@@ -116,8 +116,7 @@ label {
 }
 
 input[type="text"],
-input[type="date"],
-select {
+input[type="date"] {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid var(--border);
@@ -125,6 +124,45 @@ select {
   font-size: 1rem;
   background: var(--surface);
   color: var(--fg);
+  color-scheme: inherit;
+}
+
+.campo-fecha {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.campo-fecha input[type="date"] {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.borrar-fecha {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.borrar-fecha:hover {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.borrar-fecha[hidden] {
+  display: none;
 }
 
 button {
@@ -160,8 +198,62 @@ button.boton-valoracion:hover {
 
 button.boton-valoracion:focus-visible,
 input:focus-visible,
-select:focus-visible,
 button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.modo-busqueda {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.modo-busqueda legend {
+  padding: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
+.opciones-modo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.opcion-modo input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.opcion-modo span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg);
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.opcion-modo:hover span {
+  border-color: var(--accent);
+}
+
+.opcion-modo input[type="radio"]:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+}
+
+.opcion-modo input[type="radio"]:focus-visible + span {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
