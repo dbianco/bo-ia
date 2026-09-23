@@ -1,0 +1,42 @@
+[
+  {
+    "tool": "scrapy",
+    "status_http": 200,
+    "duracion_segundos": 5.0,
+    "documentos": 30,
+    "ids_unicos": 30,
+    "idempotencia_por_identificador": true,
+    "primer_documento": {
+      "fuente": "bop-cordoba-diputacion",
+      "identificador_externo": "BOP-A-2026-1943",
+      "fecha": "2026-06-05",
+      "titulo": "Aprobación de precio de venta al público del libro \"Un vuelo para mirar despacio. Colección Otras Publicaciones\"",
+      "texto": "Aprobación de precio de venta al público del libro \"Un vuelo para mirar despacio. Colección Otras Publicaciones\"",
+      "url_fuente": "https://bop.dipucordoba.es/visor-pdf/05-06-2026/BOP-A-2026-1943.pdf",
+      "metadata": {
+        "organismo": "Diputación de Córdoba"
+      }
+    },
+    "hash_respuesta": "16b49f6bd30161f543715d5d4cc05296d21d346bc0ef8c30a2166c7cd39f19ae"
+  },
+  {
+    "tool": "playwright",
+    "status_http": 200,
+    "duracion_segundos": 5.209,
+    "documentos": 30,
+    "ids_unicos": 30,
+    "idempotencia_por_identificador": true,
+    "primer_documento": {
+      "fuente": "bop-cordoba-diputacion",
+      "identificador_externo": "BOP-A-2026-1943",
+      "fecha": "2026-06-05",
+      "titulo": "Aprobación de precio de venta al público del libro \"Un vuelo para mirar despacio. Colección Otras Publicaciones\"",
+      "texto": "Aprobación de precio de venta al público del libro \"Un vuelo para mirar despacio. Colección Otras Publicaciones\"",
+      "url_fuente": "https://bop.dipucordoba.es/visor-pdf/05-06-2026/BOP-A-2026-1943.pdf",
+      "metadata": {
+        "organismo": "Diputación de Córdoba"
+      }
+    },
+    "hash_respuesta": "c41c6d15f92fbbe0272b872c4a513ec8a5ba23be3b57335f6c46560440bc4b50"
+  }
+]

@@ -14,6 +14,9 @@ dependencies = [
     "alembic>=1.14,<2.0",
     "pydantic-settings>=2.6,<3.0",
     "pyyaml>=6.0,<7.0",  # parsea installation.yaml (config de instalación); no hay parser YAML en la librería estándar
+    "scrapy>=2.19,<3.0",  # motor de conectores (Etapa 2); recomendado por docs/superpowers/reports/2026-09-23-scraping-poc.md
+    "apscheduler>=3.11,<4.0",  # scheduler in-process (Etapa 2)
+    "pypdf>=6.0,<7.0",  # extracción de texto de PDF en el conector del BOP (Etapa 2)
 ]
 
 [project.optional-dependencies]
@@ -52,4 +55,5 @@ pythonpath = ["."]
 markers = [
     "slow: tests que descargan o cargan el modelo real de embeddings (excluidos de la corrida rápida con -m 'not slow')",
     "docker: smoke tests que levantan el stack completo con docker compose (lentos, requieren Docker)",
+    "live: tests que hacen una llamada de red real a un sitio externo (excluidos por defecto y de CI)",
 ]

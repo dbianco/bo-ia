@@ -37,9 +37,20 @@ class FiltroRangoNumerico(BaseModel):
 Filtro = Annotated[FiltroSeleccion | FiltroRangoNumerico, Field(discriminator="tipo")]
 
 
+class ConectorConfig(BaseModel):
+    """Bloque opcional de conector de una fuente (Etapa 2, FR-013): `tipo`
+    referencia una clave de `src/connectors/registry.py`, no un import
+    directo, para que declarar una fuente nueva no requiera tocar código."""
+
+    tipo: str
+    frecuencia_minutos: float
+    config: dict = Field(default_factory=dict)
+
+
 class FuenteConfig(BaseModel):
     clave: str
     nombre: str
+    conector: ConectorConfig | None = None
 
 
 class InstallationConfig(BaseModel):

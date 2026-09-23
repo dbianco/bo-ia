@@ -25,20 +25,22 @@ Fuente: `spec.md` de esta feature y `docs/superpowers/reports/2026-09-23-scrapin
 
 ## Project Structure
 
-Lista inicial; se actualiza con los nombres reales de la migración y el árbol final antes de `verify`, igual que en la Etapa 1.
+Lista final real, actualizada tras `implement` (igual que en la Etapa 1).
 
 Modificados:
 
 - `backend/pyproject.toml`
 - `backend/src/db/models.py`
 - `backend/src/api/main.py`
+- `backend/src/config/installation.py` (bloque `conector` opcional en `FuenteConfig`)
 - `installation.yaml`
 - `README.md`
 - `backend/tests/test_migrations.py`
+- `.github/workflows/ci.yml` (excluye el marker `live`, igual que `docker`)
 
 Nuevos:
 
-- `backend/src/db/migrations/versions/<rev>_create_ejecuciones_fuente.py`
+- `backend/src/db/migrations/versions/beff2319f387_create_ejecuciones_fuente.py`
 - `backend/src/connectors/__init__.py`
 - `backend/src/connectors/protocol.py` (`Conector`, `ErrorDescubrimiento`)
 - `backend/src/connectors/registry.py`
@@ -50,12 +52,21 @@ Nuevos:
 - `backend/src/scheduler/__init__.py`
 - `backend/src/api/fuentes.py` (`POST /v1/fuentes/{clave}/ejecutar`)
 - `backend/tests/fixtures/bop_cordoba/index.html`
-- `backend/tests/fixtures/bop_cordoba/anuncio_ok.pdf`
-- `backend/tests/fixtures/bop_cordoba/anuncio_corrupto.pdf`
+- `backend/tests/fixtures/bop_cordoba/pdfs/BOP-C-2026-0001.pdf`
+- `backend/tests/fixtures/bop_cordoba/pdfs/BOP-C-2026-0002.pdf`
+- `backend/tests/fixtures/bop_cordoba/pdfs/BOP-C-2026-0003.pdf`
+- `backend/tests/fixtures/bop_cordoba/pdfs/BOP-C-2026-0004.pdf` (PDF corrupto, a propósito)
+- `backend/tests/connectors/__init__.py`
 - `backend/tests/connectors/test_bop_cordoba.py`
+- `backend/tests/connectors/test_bop_cordoba_live.py` (marcado `live`)
 - `backend/tests/connectors/test_runner.py`
+- `backend/tests/scheduler/__init__.py`
 - `backend/tests/scheduler/test_scheduler.py`
 - `backend/tests/api/test_fuentes.py`
+- `specs/etapa-2-ingesta-operativa/spec.md`
+- `specs/etapa-2-ingesta-operativa/plan.md`
+- `specs/etapa-2-ingesta-operativa/tasks.md`
+- `specs/etapa-2-ingesta-operativa/verify-evidence.md`
 
 ## Research
 

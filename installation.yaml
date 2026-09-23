@@ -8,6 +8,13 @@ nombre: Boletines Córdoba
 fuentes:
   - clave: cordoba-provincial
     nombre: Boletín Oficial de la Provincia de Córdoba
+    # Etapa 2 (ingesta operativa): conector real, corre una vez por día.
+    # Sin `fecha` en config, usa la fecha de hoy en cada corrida.
+    conector:
+      tipo: bop-cordoba-scrapy
+      frecuencia_minutos: 1440
+      config:
+        url_template: "https://bop.dipucordoba.es/dia/{fecha}"
   - clave: carlos-paz-municipal
     nombre: Boletín Municipal de Carlos Paz
   - clave: noetinger-municipal

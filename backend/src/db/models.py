@@ -53,6 +53,42 @@ class Fuente(Base):
     )
 
     documentos: Mapped[list[Documento]] = relationship(back_populates="fuente")
+    ejecuciones: Mapped[list[EjecucionFuente]] = relationship(back_populates="fuente")
+
+
+ESTADOS_EJECUCION = ("en_curso", "completada", "fallida")
+
+
+class EjecucionFuente(Base):
+    """Una corrida de un conector sobre una fuente (Etapa 2, sección 4.4
+    del design spec). Registra qué encontró y qué falló, sin depender de
+    revisar logs."""
+
+    __tablename__ = "ejecuciones_fuente"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fuente_id: Mapped[int] = mapped_column(ForeignKey("fuentes.id"), nullable=False)
+    inicio: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fin: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    estado: Mapped[str] = mapped_column(String(32), nullable=False)
+    descubiertos: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    nuevos: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    existentes: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    errores: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    version_conector: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Lista de {"identificador_externo": str | None, "error": str}, una por
+    # documento que falló dentro de esta ejecución.
+    detalle_errores: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    fuente: Mapped[Fuente] = relationship(back_populates="ejecuciones")
+
+    __table_args__ = (
+        CheckConstraint(f"estado IN {ESTADOS_EJECUCION}", name="ck_ejecucion_fuente_estado"),
+        Index("ix_ejecuciones_fuente_fuente_id_inicio", "fuente_id", "inicio"),
+    )
 
 
 class Documento(Base):

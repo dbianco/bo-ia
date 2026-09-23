@@ -44,7 +44,7 @@ jobs:
         run: ruff check src tests
 
       - name: Tests (incluye la verificación real del modelo de embeddings)
-        run: pytest -m "not docker" -v
+        run: pytest -m "not docker and not live" -v
 
   smoke:
     runs-on: ubuntu-latest

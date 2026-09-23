@@ -62,8 +62,9 @@ def test_each_revision_downgrades_one_step_cleanly(alembic_config: Config) -> No
     """Cada revisión individual puede bajar un paso y volver a subir sin error."""
     command.upgrade(alembic_config, "head")
     # boletines, fragmentos, tags/fragmento_tags, valoraciones, texto_tsv,
-    # generalización a documentos/fuentes (Etapa 1).
-    for _ in range(6):
+    # generalización a documentos/fuentes (Etapa 1), ejecuciones_fuente
+    # (Etapa 2).
+    for _ in range(7):
         command.downgrade(alembic_config, "-1")
     command.upgrade(alembic_config, "head")
 
