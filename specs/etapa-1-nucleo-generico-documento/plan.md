@@ -63,11 +63,17 @@ Nuevos:
 - `backend/src/api/config.py` (`GET /v1/config`)
 - `installation.yaml` (configuración de instalación del vertical Boletín, raíz del repo)
 - `backend/src/seed/sample_documentos.json` (reemplaza a `sample_boletines.json`; incluye dos municipios para SC-002/SC-005)
-- `backend/tests/config/__init__.py`, `backend/tests/config/test_installation.py`
-- `backend/tests/search/__init__.py`, `backend/tests/search/test_filters.py`
+- `backend/tests/config/__init__.py`
+- `backend/tests/config/test_installation.py`
+- `backend/tests/search/__init__.py`
+- `backend/tests/search/test_filters.py`
 - `backend/tests/api/test_config.py`
 - `backend/tests/api/test_search_filters.py`
 - `backend/tests/api/test_search_recall.py` (riesgo 10.6: verifica el estado real de `hnsw.iterative_scan` y un caso de filtro selectivo con 200 no-matches)
+- `specs/etapa-1-nucleo-generico-documento/spec.md`
+- `specs/etapa-1-nucleo-generico-documento/plan.md`
+- `specs/etapa-1-nucleo-generico-documento/tasks.md`
+- `specs/etapa-1-nucleo-generico-documento/verify-evidence.md`
 
 Eliminados:
 
@@ -81,4 +87,4 @@ Eliminados:
 - **`aplicar_filtros` como módulo puro (`backend/src/search/filters.py`):** sin importar SQLAlchemy `Session` ni FastAPI, para que la Etapa 3 lo reutilice desde suscripciones sin acoplarse a la capa HTTP (FR-013).
 - **Extracción de `ingerir_documento` (`backend/src/ingestor/contract.py`):** hoy la lógica de fragmentar y generar embeddings está duplicada entre `backend/src/api/ingest.py` y `backend/src/seed/seed.py`. Se extrae una única función y un contrato `DocumentoNormalizado`, y el adaptador del Boletín (`backend/src/ingestor/adapters/boletin.py`) traduce sus campos a ese contrato antes de llamarla.
 - **Migración única y reversible:** en vez de varias migraciones pequeñas, una sola revisión Alembic agrupa el rename, la tabla `fuentes`, el backfill y los índices nuevos, para que el ciclo `upgrade → downgrade → upgrade` (SC-006) sea una sola operación de comprobar, siguiendo el patrón ya usado por `test_migrations.py`.
-- **Pendiente de verificar antes de `verify`:** la versión de pgvector instalada en `pgvector/pgvector:pg16` (riesgo 10.6 del design spec — filtrar sobre el índice HNSW puede reducir el recall). Se agrega como tarea explícita en `tasks.md`, no se resuelve en esta fase de planificación.
+- **Riesgo 10.6 del design spec (índice HNSW + filtro selectivo):** verificado en `implement` (T025). La versión de pgvector instalada es 0.8.5, que soporta `hnsw.iterative_scan` (la mitigación), pero está apagado por defecto. No se pudo reproducir una pérdida real de recall con datos sintéticos; ver `verify-evidence.md` para el detalle y el gap que queda abierto para cuando haya un corpus real de mayor volumen.
