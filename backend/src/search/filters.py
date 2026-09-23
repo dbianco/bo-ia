@@ -69,3 +69,54 @@ def aplicar_filtros(
             for condicion in _condiciones_rango(filtro, valor):
                 stmt = stmt.where(condicion)
     return stmt
+
+
+def construir_filtros_suscripcion(
+    filtros_solicitados: dict[str, str], filtros_declarados: list[Filtro]
+) -> dict[str, dict]:
+    """Snapshot autocontenido de los filtros de una suscripción (Etapa 3,
+    FR-008): cada clave guarda su tipo y valor, para que `cumple_filtros`
+    no dependa de releer `installation.yaml` en cada evaluación — una
+    suscripción sigue evaluándose igual aunque la instalación cambie sus
+    filtros declarados después de crearla."""
+    declarados = {f.clave: f for f in filtros_declarados}
+    snapshot: dict[str, dict] = {}
+    for clave, valor in filtros_solicitados.items():
+        filtro = declarados.get(clave)
+        if filtro is None:
+            raise FiltroNoDeclarado(clave)
+        if isinstance(filtro, FiltroRangoNumerico):
+            _condiciones_rango(filtro, valor)  # valida el formato "min,max"; descarta el resultado SQL
+        snapshot[clave] = {"tipo": filtro.tipo, "valor": valor}
+    return snapshot
+
+
+def _cumple_rango(valor_documento, valor_filtro: str) -> bool:
+    if valor_documento is None:
+        return False
+    try:
+        valor_num = float(valor_documento)
+    except (TypeError, ValueError):
+        return False
+    minimo_str, _, maximo_str = valor_filtro.partition(",")
+    if minimo_str and valor_num < float(minimo_str):
+        return False
+    if maximo_str and valor_num > float(maximo_str):
+        return False
+    return True
+
+
+def cumple_filtros(metadata: dict, filtros_snapshot: dict[str, dict]) -> bool:
+    """Evalúa el snapshot de una suscripción (de `construir_filtros_suscripcion`)
+    contra la metadata de un documento concreto, en Python puro (FR-013).
+    Usado por `evaluar_documento`, donde ya se tiene un único documento en
+    memoria y no vale la pena armar una consulta SQL."""
+    for clave, filtro in filtros_snapshot.items():
+        valor_documento = metadata.get(clave)
+        if filtro["tipo"] == "seleccion":
+            if valor_documento != filtro["valor"]:
+                return False
+        else:
+            if not _cumple_rango(valor_documento, filtro["valor"]):
+                return False
+    return True

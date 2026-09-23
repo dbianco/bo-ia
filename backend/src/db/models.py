@@ -220,3 +220,105 @@ class Valoracion(Base):
     __table_args__ = (
         CheckConstraint(f"valor IN {VALORES_FEEDBACK}", name="ck_valoracion_valor"),
     )
+
+
+class Usuario(Base):
+    """Un cliente de la instalación (Etapa 3, sección 3.2 del design spec).
+    Multiusuario dentro de una instalación, sin organizaciones ni roles
+    jerárquicos todavía."""
+
+    __tablename__ = "usuarios"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(256), nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    sesiones: Mapped[list[Sesion]] = relationship(back_populates="usuario", cascade="all, delete-orphan")
+    suscripciones: Mapped[list[Suscripcion]] = relationship(
+        back_populates="usuario", cascade="all, delete-orphan"
+    )
+
+
+class Sesion(Base):
+    """Una sesión de login activa. El token es opaco; toda la validación
+    (existencia, expiración) pasa por esta tabla, no por un JWT."""
+
+    __tablename__ = "sesiones"
+
+    token: Mapped[str] = mapped_column(String(64), primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    expira_en: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    usuario: Mapped[Usuario] = relationship(back_populates="sesiones")
+
+
+ESTADOS_SUSCRIPCION = ("activa", "pausada")
+
+
+class Suscripcion(Base):
+    """Una consulta persistente de un usuario (sección 4.5 del design
+    spec). `filtros` es un snapshot autocontenido (clave -> {tipo, valor}),
+    no una referencia a `installation.yaml`: se evalúa igual aunque la
+    instalación cambie sus filtros declarados después de crearla.
+
+    `canales` y `frecuencia_notificacion` están contemplados en el modelo
+    de datos de la sección 4.5, pero sin lógica de envío — eso es la
+    Etapa 4."""
+
+    __tablename__ = "suscripciones"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    texto_busqueda: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
+    filtros: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    estado: Mapped[str] = mapped_column(String(16), nullable=False, server_default="activa")
+    canales: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
+    frecuencia_notificacion: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ultima_evaluacion: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    usuario: Mapped[Usuario] = relationship(back_populates="suscripciones")
+    matches: Mapped[list[EvaluacionMatch]] = relationship(
+        back_populates="suscripcion", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint(f"estado IN {ESTADOS_SUSCRIPCION}", name="ck_suscripcion_estado"),
+    )
+
+
+class EvaluacionMatch(Base):
+    """Evidencia de que un documento matcheó una suscripción (sección 4.5
+    del design spec): documento, suscripción, score, filtros aplicados y
+    fecha de evaluación. A lo sumo un match por par (documento,
+    suscripción)."""
+
+    __tablename__ = "evaluaciones_match"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    documento_id: Mapped[int] = mapped_column(ForeignKey("documentos.id", ondelete="CASCADE"), nullable=False)
+    suscripcion_id: Mapped[int] = mapped_column(
+        ForeignKey("suscripciones.id", ondelete="CASCADE"), nullable=False
+    )
+    score: Mapped[float] = mapped_column(nullable=False)
+    filtros_aplicados: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    fecha_evaluacion: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    suscripcion: Mapped[Suscripcion] = relationship(back_populates="matches")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "documento_id", "suscripcion_id", name="uq_evaluacion_match_documento_suscripcion"
+        ),
+    )

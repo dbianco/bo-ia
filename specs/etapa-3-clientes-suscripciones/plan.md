@@ -27,16 +27,23 @@ Fuente: `spec.md` de esta feature
 
 Lista inicial; se actualiza con el nombre real de la migración y el árbol final antes de `verify`.
 
+Lista final real, actualizada tras `implement`.
+
 Modificados:
 
 - `backend/src/db/models.py`
-- `backend/src/ingestor/contract.py` (llama a `evaluar_documento` al completar un documento nuevo)
+- `backend/src/ingestor/contract.py` (llama a `evaluar_documento` al completar un documento nuevo, fuera del try/except de fragmentación para que un error de evaluación no revierta un documento ya ingerido bien)
 - `backend/src/api/main.py` (registra los routers nuevos)
+- `backend/src/api/deps.py` (`COOKIE_SESION`, `get_usuario_actual`)
+- `backend/src/search/filters.py` (se extiende: `construir_filtros_suscripcion`, `cumple_filtros`)
 - `backend/tests/test_migrations.py`
+- `backend/tests/conftest.py` (agrega `usuarios` al `TRUNCATE`; sin él, `sesiones`/`suscripciones` se filtraban entre tests)
+- `backend/tests/search/test_filters.py` (se extiende con los tests de `construir_filtros_suscripcion`/`cumple_filtros`)
+- `README.md`
 
 Nuevos:
 
-- `backend/src/db/migrations/versions/<rev>_create_usuarios_suscripciones.py`
+- `backend/src/db/migrations/versions/561281315b74_create_usuarios_suscripciones.py`
 - `backend/src/auth/__init__.py`
 - `backend/src/auth/security.py` (`hash_password`, `verificar_password`)
 - `backend/src/auth/sessions.py` (`crear_sesion`, `obtener_usuario_de_sesion`, `invalidar_sesion`)
@@ -44,13 +51,17 @@ Nuevos:
 - `backend/src/api/suscripciones.py` (`POST/GET /v1/suscripciones`, `POST .../pausar`, `POST .../reanudar`, `DELETE /v1/suscripciones/{id}`)
 - `backend/src/subscriptions/__init__.py`
 - `backend/src/subscriptions/evaluator.py` (`evaluar_documento`)
-- `backend/src/search/filters.py` (se extiende: `construir_filtros_suscripcion`, `cumple_filtros`)
+- `backend/tests/auth/__init__.py`
 - `backend/tests/auth/test_security.py`
 - `backend/tests/auth/test_sessions.py`
 - `backend/tests/api/test_auth.py`
 - `backend/tests/api/test_suscripciones.py`
+- `backend/tests/subscriptions/__init__.py`
 - `backend/tests/subscriptions/test_evaluator.py`
-- `backend/tests/search/test_filters.py` (se extiende con los tests de `cumple_filtros`)
+- `specs/etapa-3-clientes-suscripciones/spec.md`
+- `specs/etapa-3-clientes-suscripciones/plan.md`
+- `specs/etapa-3-clientes-suscripciones/tasks.md`
+- `specs/etapa-3-clientes-suscripciones/verify-evidence.md`
 
 ## Research
 

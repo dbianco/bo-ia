@@ -10,7 +10,24 @@ Motor de búsqueda semántica y monitoreo reutilizable entre temáticas. Esta in
 - **Feature MVP original (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — spec, plan, tareas y evidencia de verificación del vertical Boletín antes de la generalización.
 - **Feature Etapa 1 (spec-kit / SDD):** [specs/etapa-1-nucleo-generico-documento/](specs/etapa-1-nucleo-generico-documento/) — generalización del núcleo (`Documento`, `fuentes`, `installation.yaml`, filtros declarados).
 - **Feature Etapa 2 (spec-kit / SDD):** [specs/etapa-2-ingesta-operativa/](specs/etapa-2-ingesta-operativa/) — scheduler, interfaz de conector, `EjecucionFuente` y el primer conector real (BOP Córdoba, Scrapy + PDF).
+- **Feature Etapa 3 (spec-kit / SDD):** [specs/etapa-3-clientes-suscripciones/](specs/etapa-3-clientes-suscripciones/) — autenticación con sesiones, suscripciones y evaluación síncrona de documentos nuevos.
 - **Checklist de accesibilidad:** [backend/tests/manual/accessibility-checklist.md](backend/tests/manual/accessibility-checklist.md) (WCAG 2.1 AA).
+
+## Clientes y suscripciones (Etapa 3)
+
+La autenticación usa sesiones con cookie HttpOnly (tabla `sesiones`, no JWT). `GET /v1/search` y `GET /v1/config` siguen públicos; solo gestionar suscripciones requiere cuenta. Todavía no hay pantallas de login en la web — se prueba con `curl`/`httpx` guardando la cookie:
+
+```bash
+curl -c cookies.txt -X POST http://localhost:9101/v1/auth/registro \
+  -H 'content-type: application/json' -d '{"email": "cliente@example.org", "password": "una-contraseña-larga"}'
+curl -b cookies.txt -c cookies.txt -X POST http://localhost:9101/v1/auth/login \
+  -H 'content-type: application/json' -d '{"email": "cliente@example.org", "password": "una-contraseña-larga"}'
+curl -b cookies.txt -X POST http://localhost:9101/v1/suscripciones \
+  -H 'content-type: application/json' \
+  -d '{"texto_busqueda": "licitaciones de obra vial", "filtros": {"municipio": "Carlos Paz"}}'
+```
+
+Cuando termina la ingesta de un documento genuinamente nuevo, el sistema lo evalúa contra cada suscripción activa (síncrono, dentro de `ingerir_documento`): aplica primero los filtros de la suscripción, y si pasa, compara su embedding con los fragmentos del documento. Un match queda registrado en `evaluaciones_match` con score, filtros aplicados y fecha — sin enviar ninguna notificación todavía (eso es la Etapa 4).
 
 ## Configuración de instalación
 
@@ -50,6 +67,14 @@ Endpoints disponibles en el backend (`http://localhost:9101`):
 | `POST /v1/documentos` | Ingesta de un documento (valida, fragmenta, genera embeddings) |
 | `POST /v1/fuentes/{clave}/ejecutar` | Dispara una corrida manual del conector de una fuente |
 | `POST /v1/valoraciones` | Registra un pulgar arriba/abajo sobre un resultado |
+| `POST /v1/auth/registro` | Crea una cuenta (email + contraseña) |
+| `POST /v1/auth/login` | Inicia sesión, setea la cookie `bo_ia_sesion` |
+| `POST /v1/auth/logout` | Cierra la sesión actual |
+| `POST /v1/suscripciones` | Crea una suscripción propia (requiere sesión) |
+| `GET /v1/suscripciones` | Lista las suscripciones propias (requiere sesión) |
+| `POST /v1/suscripciones/{id}/pausar` | Pausa una suscripción propia |
+| `POST /v1/suscripciones/{id}/reanudar` | Reanuda una suscripción propia |
+| `DELETE /v1/suscripciones/{id}` | Borra una suscripción propia |
 | `GET /health` | Chequeo de salud |
 
 ## Estructura del repositorio

@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session
 
 from src.config.installation import FiltroRangoNumerico, FiltroSeleccion
 from src.db.models import Documento, Fuente
-from src.search.filters import FiltroNoDeclarado, ValorDeFiltroInvalido, aplicar_filtros
+from src.search.filters import (
+    FiltroNoDeclarado,
+    ValorDeFiltroInvalido,
+    aplicar_filtros,
+    construir_filtros_suscripcion,
+    cumple_filtros,
+)
 
 FILTROS_DECLARADOS = [
     FiltroSeleccion(clave="municipio", etiqueta="Municipio"),
@@ -78,3 +84,43 @@ def test_filtro_rango_numerico_con_valor_no_numerico_es_invalido(db_session: Ses
 def test_filtro_no_declarado_es_rechazado(db_session: Session) -> None:
     with pytest.raises(FiltroNoDeclarado):
         aplicar_filtros(select(Documento), {"clave_inventada": "x"}, FILTROS_DECLARADOS)
+
+
+# T008: construir_filtros_suscripcion y cumple_filtros (FR-008, FR-013)
+
+
+def test_construir_filtros_suscripcion_guarda_tipo_y_valor() -> None:
+    snapshot = construir_filtros_suscripcion({"municipio": "Carlos Paz"}, FILTROS_DECLARADOS)
+
+    assert snapshot == {"municipio": {"tipo": "seleccion", "valor": "Carlos Paz"}}
+
+
+def test_construir_filtros_suscripcion_rechaza_clave_no_declarada() -> None:
+    with pytest.raises(FiltroNoDeclarado):
+        construir_filtros_suscripcion({"clave_inventada": "x"}, FILTROS_DECLARADOS)
+
+
+def test_construir_filtros_suscripcion_rechaza_rango_invalido() -> None:
+    with pytest.raises(ValorDeFiltroInvalido):
+        construir_filtros_suscripcion({"presupuesto_estimado": "no-numerico,"}, FILTROS_DECLARADOS)
+
+
+def test_cumple_filtros_sin_filtros_declarados_siempre_cumple() -> None:
+    assert cumple_filtros({"municipio": "Carlos Paz"}, {}) is True
+
+
+def test_cumple_filtros_seleccion_exige_el_valor_exacto() -> None:
+    snapshot = {"municipio": {"tipo": "seleccion", "valor": "Carlos Paz"}}
+
+    assert cumple_filtros({"municipio": "Carlos Paz"}, snapshot) is True
+    assert cumple_filtros({"municipio": "Noetinger"}, snapshot) is False
+    assert cumple_filtros({}, snapshot) is False
+
+
+def test_cumple_filtros_rango_numerico_respeta_minimo_y_maximo() -> None:
+    snapshot = {"presupuesto_estimado": {"tipo": "rango_numerico", "valor": "100000,500000"}}
+
+    assert cumple_filtros({"presupuesto_estimado": 150_000}, snapshot) is True
+    assert cumple_filtros({"presupuesto_estimado": 50_000}, snapshot) is False
+    assert cumple_filtros({"presupuesto_estimado": 900_000}, snapshot) is False
+    assert cumple_filtros({}, snapshot) is False

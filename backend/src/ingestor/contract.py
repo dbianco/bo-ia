@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from src.db.models import Documento, Fragmento, Fuente
 from src.ingestor.fragmenter import fragmentar_texto
 from src.processor.embeddings import EmbeddingProvider
+from src.subscriptions.evaluator import evaluar_documento
 
 
 class DocumentoInvalido(ValueError):
@@ -157,5 +158,10 @@ def ingerir_documento(
         raise ErrorDeProcesamiento(
             "Error al fragmentar o generar embeddings; el documento quedó registrado con estado 'error'."
         ) from exc
+
+    # FR-012: solo para un documento genuinamente nuevo y ya completo. Fuera
+    # del try/except de arriba a propósito: un error acá no debe revertir un
+    # documento que ya se ingirió bien a estado="error".
+    evaluar_documento(session, documento)
 
     return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=len(textos))
