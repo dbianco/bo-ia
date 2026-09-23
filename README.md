@@ -2,24 +2,26 @@
 
 [![CI](https://github.com/dbianco/bo-ia/actions/workflows/ci.yml/badge.svg)](https://github.com/dbianco/bo-ia/actions/workflows/ci.yml)
 
-Plataforma de búsqueda semántica del Boletín Oficial de la Provincia de Córdoba.
+Motor de búsqueda semántica y monitoreo reutilizable entre temáticas. Esta instalación corre el vertical del Boletín Oficial de la Provincia de Córdoba.
 
 ## Documentación
 
-- **Spec de diseño:** [docs/superpowers/specs/2026-09-16-boletin-oficial-design.md](docs/superpowers/specs/2026-09-16-boletin-oficial-design.md) — contexto, alcance por etapas, arquitectura y modelo de datos.
-- **Feature MVP (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — `spec.md`, `plan.md`, `tasks.md` y `verify-evidence.md` de la Etapa 1.
+- **Spec de la plataforma:** [docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md](docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md) — motivación, decisiones arquitectónicas y diseño detallado de la Etapa 1 (sección 8).
+- **Feature MVP original (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — spec, plan, tareas y evidencia de verificación del vertical Boletín antes de la generalización.
+- **Feature Etapa 1 (spec-kit / SDD):** [specs/etapa-1-nucleo-generico-documento/](specs/etapa-1-nucleo-generico-documento/) — generalización del núcleo (`Documento`, `fuentes`, `installation.yaml`, filtros declarados).
 - **Checklist de accesibilidad:** [backend/tests/manual/accessibility-checklist.md](backend/tests/manual/accessibility-checklist.md) (WCAG 2.1 AA).
 
-## Estado actual
+## Configuración de instalación
 
-El MVP (Etapa 1) está completo: las 31 tareas de `tasks.md` implementadas y verificadas con comandos reales (tests, `docker compose` real, CI real en GitHub Actions). La feature está en la fase `verify` del flujo de SDD (spec-kit); ver `verify-evidence.md` para el detalle de qué se verificó y los gaps conocidos (Windows sin probar, tiempo de respuesta sin medición automatizada, evaluación manual pendiente de datos reales).
+`installation.yaml` (raíz del repo) define el nombre de la instalación, las fuentes iniciales y los filtros que expone la búsqueda — ver `INSTALLATION_CONFIG` en `.env.example`. Agregar una fuente o un filtro nuevo no requiere tocar el motor.
 
 Endpoints disponibles en el backend (`http://localhost:9101`):
 
 | Método y ruta | Qué hace |
 |---|---|
-| `GET /v1/search` | Búsqueda semántica (`q`, `date_from`, `date_to`, `limit`) |
-| `POST /v1/boletines` | Ingesta de un boletín (valida, fragmenta, genera embeddings) |
+| `GET /v1/search` | Búsqueda semántica (`q`, `date_from`, `date_to`, `limit`, `mode`, `filtro.<clave>` por cada filtro declarado) |
+| `GET /v1/config` | Nombre de la instalación y filtros declarados en `installation.yaml` |
+| `POST /v1/documentos` | Ingesta de un documento (valida, fragmenta, genera embeddings) |
 | `POST /v1/valoraciones` | Registra un pulgar arriba/abajo sobre un resultado |
 | `GET /health` | Chequeo de salud |
 
@@ -41,7 +43,7 @@ docker compose up --build
 
 Esto levanta tres servicios: `db` (PostgreSQL + pgvector, puerto 9100), `backend` (Ingestor + Procesador + API, puerto 9101) y `web` (interfaz de búsqueda, puerto 9102). Los puertos están en el rango 9100 para evitar choques con otras apps corriendo en la máquina.
 
-Al arrancar, el backend corre las migraciones de Alembic automáticamente y carga un puñado de boletines de ejemplo si la base está vacía. La primera vez descarga el modelo de embeddings (`Qwen/Qwen3-Embedding-0.6B`, ~1 GB) y lo cachea en un volumen; los arranques siguientes son instantáneos.
+Al arrancar, el backend corre las migraciones de Alembic, aplica `installation.yaml` (crea las fuentes declaradas) y carga un puñado de documentos de ejemplo si la base está vacía. La primera vez descarga el modelo de embeddings (`Qwen/Qwen3-Embedding-0.6B`, ~1 GB) y lo cachea en un volumen; los arranques siguientes son instantáneos.
 
 Abrí `http://localhost:9102` para usar la interfaz, o probá la API directamente:
 

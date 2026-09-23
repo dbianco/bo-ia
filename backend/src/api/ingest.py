@@ -1,10 +1,6 @@
-"""Endpoint de ingesta: POST /v1/boletines (FR-001 a FR-007).
-
-Orquesta el ingestor (validación + persistencia idempotente del boletín)
-y el fragmentador + embeddings. El boletín se commitea apenas se valida,
-antes de intentar fragmentar: así, si la fragmentación o el embedding
-fallan, el documento ya recibido no se pierde (FR-006) — solo queda
-marcado con estado_ingesta="error", en su propio commit separado.
+"""Endpoint de ingesta genérico: POST /v1/documentos (FR-001 a FR-003,
+FR-006). Capa fina sobre `ingerir_documento` (`src/ingestor/contract.py`),
+que hace todo el trabajo de persistencia, fragmentación y embeddings.
 """
 from __future__ import annotations
 
@@ -15,100 +11,67 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_embedder, get_session
-from src.db.models import Fragmento
-from src.ingestor.fragmenter import fragmentar_texto
-from src.ingestor.ingest import BoletinInvalido, ingerir_boletin
+from src.ingestor.contract import (
+    DocumentoInvalido,
+    DocumentoNormalizado,
+    ErrorDeProcesamiento,
+    ingerir_documento,
+)
 from src.processor.embeddings import EmbeddingProvider
 
 router = APIRouter()
 
 
-class BoletinEntrada(BaseModel):
-    jurisdiccion: str
-    identificador_oficial: str
-    fecha_publicacion: date
-    texto_original: str = Field(min_length=1)
-    url_oficial: str
+class DocumentoEntrada(BaseModel):
+    fuente_clave: str
+    identificador_externo: str
+    fecha: date
+    texto: str = Field(min_length=1)
+    url_fuente: str
     titulo: str | None = None
+    metadata: dict = Field(default_factory=dict)
     tamano_fragmento: int = 1000
     solapamiento_fragmento: int = 200
 
 
-class BoletinSalida(BaseModel):
-    boletin_id: int
+class DocumentoSalida(BaseModel):
+    documento_id: int
     ya_existia: bool
-    estado_ingesta: str
+    estado: str
     fragmentos_creados: int
 
 
-@router.post("/v1/boletines", status_code=201, response_model=BoletinSalida)
+@router.post("/v1/documentos", status_code=201, response_model=DocumentoSalida)
 def ingerir_endpoint(
-    entrada: BoletinEntrada,
+    entrada: DocumentoEntrada,
     session: Session = Depends(get_session),
     embedder: EmbeddingProvider = Depends(get_embedder),
-) -> BoletinSalida:
+) -> DocumentoSalida:
+    doc = DocumentoNormalizado(
+        fuente_clave=entrada.fuente_clave,
+        identificador_externo=entrada.identificador_externo,
+        fecha=entrada.fecha,
+        texto=entrada.texto,
+        url_fuente=entrada.url_fuente,
+        titulo=entrada.titulo,
+        metadata=entrada.metadata,
+    )
     try:
-        resultado = ingerir_boletin(
+        resultado = ingerir_documento(
             session,
-            jurisdiccion=entrada.jurisdiccion,
-            identificador_oficial=entrada.identificador_oficial,
-            fecha_publicacion=entrada.fecha_publicacion,
-            texto_original=entrada.texto_original,
-            url_oficial=entrada.url_oficial,
-            titulo=entrada.titulo,
+            embedder,
+            doc,
+            tamano_fragmento=entrada.tamano_fragmento,
+            solapamiento_fragmento=entrada.solapamiento_fragmento,
         )
-    except BoletinInvalido as exc:
+    except DocumentoInvalido as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ErrorDeProcesamiento as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    boletin = resultado.boletin
-    # El boletín queda persistido ya, independiente de lo que pase después.
-    session.commit()
-
-    if resultado.ya_existia:
-        fragmentos_existentes = session.query(Fragmento).filter_by(boletin_id=boletin.id).count()
-        return BoletinSalida(
-            boletin_id=boletin.id,
-            ya_existia=True,
-            estado_ingesta=boletin.estado_ingesta,
-            fragmentos_creados=fragmentos_existentes,
-        )
-
-    try:
-        textos = fragmentar_texto(
-            entrada.texto_original,
-            tamano=entrada.tamano_fragmento,
-            solapamiento=entrada.solapamiento_fragmento,
-        )
-        if not textos:
-            # No debería pasar (fragmentar_texto garantiza >=1 para texto no
-            # vacío), pero FR-007 se verifica explícitamente igual.
-            raise RuntimeError("La fragmentación no produjo ningún fragmento")
-
-        for posicion, texto in enumerate(textos):
-            embedding = embedder.embed_passage(texto)
-            session.add(
-                Fragmento(
-                    boletin_id=boletin.id,
-                    posicion=posicion,
-                    texto=texto,
-                    fecha_publicacion=boletin.fecha_publicacion,
-                    embedding=embedding,
-                )
-            )
-        boletin.estado_ingesta = "completo"
-        session.commit()
-    except Exception as exc:
-        session.rollback()  # descarta fragmentos parcialmente insertados
-        boletin.estado_ingesta = "error"
-        session.commit()  # FR-006: el error queda registrado sin perder el boletín
-        raise HTTPException(
-            status_code=500,
-            detail="Error al fragmentar o generar embeddings; el boletín quedó registrado con estado 'error'.",
-        ) from exc
-
-    return BoletinSalida(
-        boletin_id=boletin.id,
-        ya_existia=False,
-        estado_ingesta=boletin.estado_ingesta,
-        fragmentos_creados=len(textos),
+    return DocumentoSalida(
+        documento_id=resultado.documento.id,
+        ya_existia=resultado.ya_existia,
+        estado=resultado.documento.estado,
+        fragmentos_creados=resultado.fragmentos_creados,
     )

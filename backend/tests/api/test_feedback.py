@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.api.deps import get_session
 from src.api.main import app
-from src.db.models import Boletin, Fragmento, Valoracion
+from src.db.models import Documento, Fragmento, Fuente, Valoracion
 
 
 @pytest.fixture()
@@ -22,18 +22,21 @@ def client(db_session: Session):
 
 @pytest.fixture()
 def fragmento(db_session: Session) -> Fragmento:
-    boletin = Boletin(
-        jurisdiccion="cordoba",
-        identificador_oficial="BO-feedback-1",
-        fecha_publicacion=datetime.date(2026, 1, 1),
-        texto_original="texto",
-        url_oficial="https://boletinoficial.cba.gov.ar/BO-feedback-1",
-        hash_contenido="hash-feedback-1",
-        estado_ingesta="completo",
-    )
-    db_session.add(boletin)
+    fuente = Fuente(clave="cordoba", nombre="cordoba", config={})
+    db_session.add(fuente)
     db_session.flush()
-    frag = Fragmento(boletin_id=boletin.id, posicion=0, texto="texto", fecha_publicacion=boletin.fecha_publicacion)
+    documento = Documento(
+        fuente_id=fuente.id,
+        identificador_externo="BO-feedback-1",
+        fecha=datetime.date(2026, 1, 1),
+        texto="texto",
+        url_fuente="https://boletinoficial.cba.gov.ar/BO-feedback-1",
+        hash_contenido="hash-feedback-1",
+        estado="completo",
+    )
+    db_session.add(documento)
+    db_session.flush()
+    frag = Fragmento(documento_id=documento.id, posicion=0, texto="texto", fecha=documento.fecha)
     db_session.add(frag)
     db_session.flush()
     return frag

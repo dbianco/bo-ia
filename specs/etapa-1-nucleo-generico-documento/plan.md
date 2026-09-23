@@ -25,7 +25,7 @@ Fuente: `spec.md` de esta feature y `docs/superpowers/specs/2026-09-18-plataform
 
 ## Project Structure
 
-Lista inicial de archivos que esta etapa crea o modifica. El nombre exacto del archivo de migración se fija recién al correr `alembic revision` durante `implement`; esta lista se actualiza con el nombre real antes de `verify`, igual que se hizo en la feature del MVP.
+Lista final real, actualizada tras `implement` (igual que se hizo en la feature del MVP).
 
 Modificados:
 
@@ -52,25 +52,27 @@ Modificados:
 
 Nuevos:
 
-- `backend/src/db/migrations/versions/<rev>_generalize_documentos_fuentes.py`
-- `backend/src/ingestor/contract.py` (dataclass `DocumentoNormalizado` + `ingerir_documento`)
+- `backend/src/db/migrations/versions/a00b1eb51d18_generalize_documentos_fuentes.py`
+- `backend/src/ingestor/contract.py` (dataclass `DocumentoNormalizado`, contrato completo de ingesta: `ingerir_documento`, antes dividido entre `ingest.py` y `seed.py`)
 - `backend/src/ingestor/adapters/__init__.py`
 - `backend/src/ingestor/adapters/boletin.py` (adaptador específico del Boletín)
 - `backend/src/config/__init__.py`
-- `backend/src/config/installation.py` (modelo pydantic + loader de `installation.yaml`)
+- `backend/src/config/installation.py` (modelo pydantic, loader de `installation.yaml` y `upsert_fuentes`)
 - `backend/src/search/__init__.py`
 - `backend/src/search/filters.py` (`aplicar_filtros`, función pura)
 - `backend/src/api/config.py` (`GET /v1/config`)
 - `installation.yaml` (configuración de instalación del vertical Boletín, raíz del repo)
-- `backend/src/seed/sample_documentos.json` (reemplaza a `sample_boletines.json`; incluye más de un municipio para SC-005)
-- `backend/tests/config/test_installation.py`
-- `backend/tests/search/test_filters.py`
+- `backend/src/seed/sample_documentos.json` (reemplaza a `sample_boletines.json`; incluye dos municipios para SC-002/SC-005)
+- `backend/tests/config/__init__.py`, `backend/tests/config/test_installation.py`
+- `backend/tests/search/__init__.py`, `backend/tests/search/test_filters.py`
 - `backend/tests/api/test_config.py`
 - `backend/tests/api/test_search_filters.py`
+- `backend/tests/api/test_search_recall.py` (riesgo 10.6: verifica el estado real de `hnsw.iterative_scan` y un caso de filtro selectivo con 200 no-matches)
 
 Eliminados:
 
 - `backend/src/seed/sample_boletines.json` (reemplazado por `sample_documentos.json`)
+- `backend/src/ingestor/ingest.py` (su lógica quedó absorbida por `ingestor/contract.py`; mantenerlo hubiera duplicado la idempotencia y dejado código muerto)
 
 ## Research
 

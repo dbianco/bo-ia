@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.config.installation import InstallationConfig, cargar_installation_config
 from src.processor.embeddings import EmbeddingProvider, SentenceTransformerEmbeddingProvider
 
 
@@ -38,3 +39,12 @@ def _embedder() -> EmbeddingProvider:
 
 def get_embedder() -> EmbeddingProvider:
     return _embedder()
+
+
+@lru_cache
+def _installation_config() -> InstallationConfig:
+    return cargar_installation_config(os.environ["INSTALLATION_CONFIG"])
+
+
+def get_installation_config() -> InstallationConfig:
+    return _installation_config()

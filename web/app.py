@@ -25,7 +25,14 @@ def health() -> dict[str, str]:
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "search.html", {})
+    with httpx.Client(timeout=10.0) as client:
+        respuesta = client.get(f"{BACKEND_URL}/v1/config")
+    respuesta.raise_for_status()
+    config = respuesta.json()
+
+    return templates.TemplateResponse(
+        request, "search.html", {"nombre_instalacion": config["nombre"], "filtros": config["filtros"]}
+    )
 
 
 @app.get("/resultados", response_class=HTMLResponse)
@@ -41,6 +48,11 @@ def resultados(
         params["date_from"] = date_from
     if date_to:
         params["date_to"] = date_to
+    # Filtros declarados por la instalación (Etapa 1): se reenvían tal
+    # cual, sin que la web conozca sus claves de antemano.
+    for clave, valor in request.query_params.items():
+        if clave.startswith("filtro.") and valor:
+            params[clave] = valor
 
     with httpx.Client(timeout=30.0) as client:
         respuesta = client.get(f"{BACKEND_URL}/v1/search", params=params)

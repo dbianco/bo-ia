@@ -13,6 +13,7 @@ dependencies = [
     "transformers>=5.10,<6.0",  # >=5.10.0 corrige CVE-2026-9856 y las demás CVEs de PYSEC-2026-* (pip-audit)
     "alembic>=1.14,<2.0",
     "pydantic-settings>=2.6,<3.0",
+    "pyyaml>=6.0,<7.0",  # parsea installation.yaml (config de instalación); no hay parser YAML en la librería estándar
 ]
 
 [project.optional-dependencies]

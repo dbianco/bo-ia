@@ -1,50 +1,74 @@
 [
   {
-    "jurisdiccion": "cordoba",
+    "jurisdiccion": "cordoba-provincial",
     "identificador_oficial": "BO-DEMO-0001",
     "fecha_publicacion": "2026-01-15",
     "titulo": "Decreto de ejemplo sobre presupuesto provincial",
     "texto_original": "Decreto 12/2026 (ejemplo, dato de prueba). Se aprueba la distribución del presupuesto provincial para el ejercicio 2026, asignando partidas a los ministerios de Salud, Educación e Infraestructura. El presupuesto total asciende a un monto estimado, distribuido según los porcentajes históricos de cada área. Se establece además un fondo de contingencia para obras de emergencia vial en el interior de la provincia.",
-    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0001"
+    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0001",
+    "metadata": {"provincia": "Córdoba"}
   },
   {
-    "jurisdiccion": "cordoba",
+    "jurisdiccion": "cordoba-provincial",
     "identificador_oficial": "BO-DEMO-0002",
     "fecha_publicacion": "2026-02-03",
     "titulo": "Resolución de ejemplo sobre salud pública",
     "texto_original": "Resolución 45/2026 (ejemplo, dato de prueba) del Ministerio de Salud. Se dispone la ampliación de la campaña de vacunación estacional en los centros de salud de la provincia, incorporando nuevos puntos de aplicación en zonas rurales. Se detalla el cronograma de distribución de dosis y los requisitos para el personal sanitario a cargo de la campaña.",
-    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0002"
+    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0002",
+    "metadata": {"provincia": "Córdoba"}
   },
   {
-    "jurisdiccion": "cordoba",
+    "jurisdiccion": "cordoba-provincial",
     "identificador_oficial": "BO-DEMO-0003",
     "fecha_publicacion": "2026-03-20",
     "titulo": "Licitación de ejemplo para obra pública",
     "texto_original": "Licitación pública 8/2026 (ejemplo, dato de prueba). Se convoca a licitación para la repavimentación de un tramo de ruta provincial, incluyendo señalización horizontal y vertical. Se detallan los pliegos de condiciones, el presupuesto oficial de la obra y el plazo de ejecución estimado en seis meses desde la firma del contrato.",
-    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0003"
+    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0003",
+    "metadata": {"provincia": "Córdoba"}
   },
   {
-    "jurisdiccion": "cordoba",
+    "jurisdiccion": "cordoba-provincial",
     "identificador_oficial": "BO-DEMO-0004",
     "fecha_publicacion": "2026-04-11",
     "titulo": "Decreto de ejemplo sobre educación",
     "texto_original": "Decreto 78/2026 (ejemplo, dato de prueba). Se establece el calendario escolar para el ciclo lectivo, fijando las fechas de inicio y fin de clases, los recesos de invierno y las jornadas institucionales. Se autoriza además la incorporación de nuevas escuelas al programa de jornada extendida en barrios de la capital provincial.",
-    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0004"
+    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0004",
+    "metadata": {"provincia": "Córdoba"}
   },
   {
-    "jurisdiccion": "cordoba",
+    "jurisdiccion": "cordoba-provincial",
     "identificador_oficial": "BO-DEMO-0005",
     "fecha_publicacion": "2026-05-30",
     "titulo": "Resolución de ejemplo sobre medio ambiente",
     "texto_original": "Resolución 102/2026 (ejemplo, dato de prueba) de la Secretaría de Ambiente. Se aprueba el estudio de impacto ambiental para un proyecto de forestación en cuencas hídricas de la provincia, estableciendo las condiciones de monitoreo y las especies autorizadas para la plantación en cada región.",
-    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0005"
+    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0005",
+    "metadata": {"provincia": "Córdoba"}
   },
   {
-    "jurisdiccion": "cordoba",
+    "jurisdiccion": "cordoba-provincial",
     "identificador_oficial": "BO-DEMO-0006",
     "fecha_publicacion": "2026-06-18",
     "titulo": "Decreto de ejemplo sobre seguridad vial",
     "texto_original": "Decreto 91/2026 (ejemplo, dato de prueba). Se dispone la instalación de nuevos radares de control de velocidad en rutas provinciales con alto índice de siniestralidad, junto con una campaña de concientización sobre seguridad vial dirigida a conductores de transporte de carga y pasajeros.",
-    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0006"
+    "url_oficial": "https://boletinoficial.cba.gov.ar/ejemplo/BO-DEMO-0006",
+    "metadata": {"provincia": "Córdoba"}
+  },
+  {
+    "jurisdiccion": "carlos-paz-municipal",
+    "identificador_oficial": "BOM-CP-0001",
+    "fecha_publicacion": "2026-07-02",
+    "titulo": "Ordenanza de ejemplo sobre promoción turística",
+    "texto_original": "Ordenanza 55/2026 (ejemplo, dato de prueba) del Municipio de Carlos Paz. Se crea un fondo de promoción turística para financiar campañas de difusión del destino durante la temporada estival, incluyendo pauta digital y participación en ferias del sector.",
+    "url_oficial": "https://carlospaz.gov.ar/boletin/ejemplo/BOM-CP-0001",
+    "metadata": {"provincia": "Córdoba", "municipio": "Carlos Paz"}
+  },
+  {
+    "jurisdiccion": "noetinger-municipal",
+    "identificador_oficial": "BOM-NO-0001",
+    "fecha_publicacion": "2026-07-10",
+    "titulo": "Decreto de ejemplo sobre subsidio agrícola",
+    "texto_original": "Decreto 14/2026 (ejemplo, dato de prueba) del Municipio de Noetinger. Se dispone un subsidio para pequeños productores agrícolas afectados por la última sequía, con un monto fijo por hectárea cultivada y un plazo de inscripción de treinta días.",
+    "url_oficial": "https://noetinger.gov.ar/boletin/ejemplo/BOM-NO-0001",
+    "metadata": {"provincia": "Córdoba", "municipio": "Noetinger"}
   }
 ]

@@ -25,10 +25,12 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL}
       EMBEDDING_CACHE_DIR: ${EMBEDDING_CACHE_DIR}
       SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD}
+      INSTALLATION_CONFIG: ${INSTALLATION_CONFIG}
     ports:
       - "${BACKEND_PORT:-9101}:8000"
     volumes:
       - model-cache:${EMBEDDING_CACHE_DIR}
+      - ./installation.yaml:${INSTALLATION_CONFIG}:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s

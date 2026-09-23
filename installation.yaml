@@ -1,0 +1,22 @@
+# Configuración de instalación (Etapa 1 — núcleo genérico, ver sección 8
+# de docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md).
+# "Configuración antes que código": una nueva fuente o un filtro nuevo se
+# agregan acá, no en el motor.
+
+nombre: Boletines Córdoba
+
+fuentes:
+  - clave: cordoba-provincial
+    nombre: Boletín Oficial de la Provincia de Córdoba
+  - clave: carlos-paz-municipal
+    nombre: Boletín Municipal de Carlos Paz
+  - clave: noetinger-municipal
+    nombre: Boletín Municipal de Noetinger
+
+filtros:
+  - clave: provincia
+    etiqueta: Provincia
+    tipo: seleccion
+  - clave: municipio
+    etiqueta: Municipio
+    tipo: seleccion

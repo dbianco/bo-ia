@@ -52,7 +52,7 @@ def _truncar_tablas(database_url: str) -> None:
     plain = database_url.replace("postgresql+psycopg://", "postgresql://")
     with psycopg.connect(plain, autocommit=True) as conn, conn.cursor() as cur:
         cur.execute(
-            "TRUNCATE TABLE valoraciones, fragmento_tags, fragmentos, tags, boletines "
+            "TRUNCATE TABLE valoraciones, fragmento_tags, fragmentos, tags, documentos, fuentes "
             "RESTART IDENTITY CASCADE"
         )
 

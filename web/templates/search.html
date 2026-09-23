@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Boletín Oficial de Córdoba — Búsqueda semántica</title>
+  <title>{{ nombre_instalacion }} — Búsqueda semántica</title>
   <script>
     (function () {
       var tema = "dark";
@@ -20,8 +20,8 @@
   <main>
     <div class="encabezado">
       <div>
-        <h1>Boletín Oficial de Córdoba</h1>
-        <p class="subtitulo">Búsqueda semántica sobre boletines oficiales (MVP).</p>
+        <h1>{{ nombre_instalacion }}</h1>
+        <p class="subtitulo">Búsqueda semántica sobre documentos oficiales.</p>
       </div>
       <button
         type="button"
@@ -53,6 +53,25 @@
           </div>
         </div>
       </div>
+      {% if filtros %}
+      <fieldset class="filtros-instalacion">
+        <legend>Filtros</legend>
+        <div class="opciones-modo">
+          {% for f in filtros %}
+          <div>
+            <label for="filtro-{{ f.clave }}">{{ f.etiqueta }}</label>
+            <input
+              type="text"
+              id="filtro-{{ f.clave }}"
+              name="filtro.{{ f.clave }}"
+              autocomplete="off"
+              placeholder="{{ 'min,max' if f.tipo == 'rango_numerico' else f.etiqueta }}"
+            >
+          </div>
+          {% endfor %}
+        </div>
+      </fieldset>
+      {% endif %}
       <fieldset class="modo-busqueda">
         <legend>Modo de búsqueda</legend>
         <div class="opciones-modo">

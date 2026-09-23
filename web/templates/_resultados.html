@@ -3,11 +3,11 @@
   {% for r in resultados %}
   <li class="resultado">
     <p class="resultado-fecha">
-      {{ r.fecha_publicacion }} — {{ r.identificador_oficial }}
+      {{ r.fecha }} — {{ r.identificador_externo }}
       {% if r.coincidencia_texto %}<span class="badge-texto">coincidencia de texto</span>{% endif %}
     </p>
     <p class="resultado-texto">{{ r.texto }}</p>
-    <a href="{{ r.url_oficial }}" target="_blank" rel="noopener">Ver boletín oficial</a>
+    <a href="{{ r.url_fuente }}" target="_blank" rel="noopener">Ver documento oficial</a>
     <div class="resultado-valoracion" id="valoracion-{{ r.fragmento_id }}">
       <button
         type="button"
