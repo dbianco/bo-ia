@@ -25,8 +25,6 @@ Fuente: `spec.md` de esta feature
 
 ## Project Structure
 
-Lista inicial; se actualiza con el nombre real de la migración y el árbol final antes de `verify`.
-
 Lista final real, actualizada tras `implement`.
 
 Modificados:
