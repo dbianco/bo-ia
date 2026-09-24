@@ -12,6 +12,7 @@ Motor de búsqueda semántica y monitoreo reutilizable entre temáticas. Esta in
 - **Feature Etapa 2 (spec-kit / SDD):** [specs/etapa-2-ingesta-operativa/](specs/etapa-2-ingesta-operativa/) — scheduler, interfaz de conector, `EjecucionFuente` y el primer conector real (BOP Córdoba, Scrapy + PDF).
 - **Feature Etapa 3 (spec-kit / SDD):** [specs/etapa-3-clientes-suscripciones/](specs/etapa-3-clientes-suscripciones/) — autenticación con sesiones, suscripciones y evaluación síncrona de documentos nuevos.
 - **Feature Etapa 4 (spec-kit / SDD):** [specs/etapa-4-notificaciones/](specs/etapa-4-notificaciones/) — entrega de notificaciones (bandeja interna, correo por SMTP).
+- **Feature Etapa 5 (spec-kit / SDD):** [specs/etapa-5-segundo-vertical/](specs/etapa-5-segundo-vertical/) — segundo vertical (licitaciones argentinas), dos conectores nuevos y una segunda instalación real en paralelo.
 - **Checklist de accesibilidad:** [backend/tests/manual/accessibility-checklist.md](backend/tests/manual/accessibility-checklist.md) (WCAG 2.1 AA).
 
 ## Clientes y suscripciones (Etapa 3)
@@ -56,10 +57,11 @@ fuentes:
   - clave: cordoba-provincial
     nombre: Boletín Oficial de la Provincia de Córdoba
     conector:
-      tipo: bop-cordoba-scrapy   # clave registrada en backend/src/connectors/registry.py
-      frecuencia_minutos: 1440   # una vez por día
+      tipo: boletin-cba-pdf-diario   # clave registrada en backend/src/connectors/registry.py
+      frecuencia_minutos: 1440       # una vez por día
       config:
-        url_template: "https://bop.dipucordoba.es/dia/{fecha}"
+        url_template: "https://boletinoficial.cba.gov.ar/wp-content/4p96humuzp/{anio}/{mes}/{seccion}_Secc_{ddmmyy}.pdf"
+        secciones: [1, 2, 3, 4, 5]
 ```
 
 El scheduler corre **dentro del mismo contenedor `backend`** (no es un servicio aparte): al arrancar, programa un job por cada fuente con conector, según su `frecuencia_minutos`. Cada corrida queda registrada en `ejecuciones_fuente` (inicio, fin, descubiertos, nuevos, existentes, errores). Una fuente sin `conector` declarado sigue alimentándose solo por seed o por `POST /v1/documentos` manual, como en la Etapa 1.
@@ -70,7 +72,15 @@ Para disparar una corrida sin esperar al scheduler:
 curl -X POST http://localhost:9101/v1/fuentes/cordoba-provincial/ejecutar
 ```
 
-El único conector real hoy es `bop-cordoba-scrapy` (Scrapy + extracción de texto de PDF con `pypdf`, corriendo en un subproceso propio por corrida). Sus tests corren contra fixtures locales (`backend/tests/fixtures/bop_cordoba/`); el test marcado `live` (excluido por defecto y de CI) lo corre contra el sitio real.
+Conectores disponibles hoy (`backend/src/connectors/registry.py`):
+
+| Clave (`tipo`) | Qué hace |
+|---|---|
+| `boletin-cba-pdf-diario` | HTTP directo (`curl`, ver Etapa 5) contra `boletinoficial.cba.gov.ar`: URL de PDF predecible por sección/fecha, extrae texto con `pypdf`. Un `DocumentoNormalizado` por (fecha, sección). |
+| `comprar-gob-ar-csv` | Descarga el dataset abierto de licitaciones nacionales (`Convocatorias.csv`, datos.gob.ar) en streaming y produce un `DocumentoNormalizado` por fila, filtrado por `anio_desde` (Etapa 5). |
+| `bop-cordoba-scrapy` | Scrapy + extracción de PDF contra el Boletín Oficial de la Diputación de Córdoba, **España** (`bop.dipucordoba.es`) — conector de referencia de la Etapa 2, sin uso en ninguna instalación desde la Etapa 5 (apuntaba por error al sitio equivocado; ver `specs/etapa-5-segundo-vertical/`). Se mantiene registrado y con tests, sin borrar código ya probado. |
+
+Los tests de cada conector corren contra fixtures locales; los tests marcados `live` (excluidos por defecto y de CI) corren contra el sitio/dataset real.
 
 Endpoints disponibles en el backend (`http://localhost:9101`):
 
@@ -91,6 +101,23 @@ Endpoints disponibles en el backend (`http://localhost:9101`):
 | `DELETE /v1/suscripciones/{id}` | Borra una suscripción propia |
 | `GET /v1/notificaciones` | Bandeja de avisos propia (requiere sesión) |
 | `GET /health` | Chequeo de salud |
+
+## Segundo vertical: licitaciones argentinas (Etapa 5)
+
+`installation-licitaciones.yaml` es una segunda instalación real, "Licitaciones Argentina", que valida que el motor es reutilizable sin copiar código: declara sus propias fuentes (`comprar-ar-nacional`, `cba-provincial-licitaciones`) y sus propios filtros (`organismo`, `monto`), sin tocar `src/`. Corre como un **segundo stack de Docker Compose completo, en paralelo** al de boletines, con su propia base de datos y sus propios puertos:
+
+```bash
+cp .env.licitaciones.example .env.licitaciones   # revisar/ajustar puertos y POSTGRES_DB si hace falta
+docker compose -p bo-ia-licitaciones --env-file .env.licitaciones \
+  -f docker-compose.yml -f docker-compose.licitaciones.override.yml \
+  up -d --build
+```
+
+El override solo reemplaza el volumen que monta `installation.yaml` por `installation-licitaciones.yaml`; no duplica `docker-compose.yml`. Por defecto corre en el rango de puertos 9300 (`http://localhost:9301` el backend), independiente del stack de boletines (9100).
+
+Una instalación sin datos de ejemplo del Boletín declara `seed: false` en su `installation.yaml` — sin este flag, `sembrar_si_vacio` (pensado para la instalación original) carga sus datos de ejemplo en cualquier instalación nueva con la base vacía, sin mirar la configuración (bug real encontrado y corregido en la Etapa 5).
+
+`comprar-gob-ar-csv` acepta `limite_filas` para acotar cuántas filas del CSV se procesan por corrida — gap conocido: sin cursor, siempre ve las mismas primeras N filas que matchean `anio_desde`, nunca las siguientes (cobertura parcial permanente si se usa; ver `specs/etapa-5-segundo-vertical/verify-evidence.md`).
 
 ## Estructura del repositorio
 

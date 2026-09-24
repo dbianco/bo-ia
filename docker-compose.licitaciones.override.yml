@@ -1,0 +1,11 @@
+# Override para levantar la instalación "Licitaciones Argentina" (Etapa
+# 5 — segundo vertical) como un segundo stack real, en paralelo al de
+# "Boletines Córdoba", sin duplicar docker-compose.yml. Reemplaza solo el
+# volumen que monta el archivo de configuración de instalación.
+#
+# Uso: ver .env.licitaciones.example.
+services:
+  backend:
+    volumes:
+      - model-cache:${EMBEDDING_CACHE_DIR}
+      - ./installation-licitaciones.yaml:${INSTALLATION_CONFIG}:ro

@@ -33,9 +33,10 @@ async def lifespan(app: FastAPI):
         creadas = upsert_fuentes(session, installation)
         if creadas:
             logger.info("Config: %s fuentes nuevas de '%s'", creadas, installation.nombre)
-        creados = sembrar_si_vacio(session, get_embedder())
-        if creados:
-            logger.info("Seed: %s documentos de ejemplo cargados", creados)
+        if installation.seed:
+            creados = sembrar_si_vacio(session, get_embedder())
+            if creados:
+                logger.info("Seed: %s documentos de ejemplo cargados", creados)
     finally:
         session.close()
 

@@ -57,6 +57,11 @@ class InstallationConfig(BaseModel):
     nombre: str
     fuentes: list[FuenteConfig] = Field(default_factory=list)
     filtros: list[Filtro] = Field(default_factory=list)
+    # Etapa 5: `sembrar_si_vacio` carga datos de ejemplo específicos del
+    # Boletín (sección 8 del design spec); una instalación de otro
+    # vertical no debe recibirlos. Default `True` para no cambiar el
+    # comportamiento de la instalación de boletines ya existente.
+    seed: bool = True
 
 
 def cargar_installation_config(ruta: str | Path) -> InstallationConfig:

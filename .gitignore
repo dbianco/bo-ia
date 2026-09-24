@@ -1,6 +1,7 @@
 .DS_Store
 docs/jurisprudencia.docx
 .env
+.env.licitaciones
 .venv/
 __pycache__/
 *.pyc

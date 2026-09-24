@@ -4,6 +4,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
+# curl: usado por el conector boletin-cba-pdf-diario (Etapa 5) en vez de
+# urllib — boletinoficial.cba.gov.ar (CloudFront) devuelve 403 a
+# peticiones de urllib pero no a las de curl (ver
+# src/connectors/boletin_cba/connector.py).
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY pyproject.toml alembic.ini ./

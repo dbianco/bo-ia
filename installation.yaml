@@ -8,13 +8,17 @@ nombre: Boletines Córdoba
 fuentes:
   - clave: cordoba-provincial
     nombre: Boletín Oficial de la Provincia de Córdoba
-    # Etapa 2 (ingesta operativa): conector real, corre una vez por día.
-    # Sin `fecha` en config, usa la fecha de hoy en cada corrida.
+    # Etapa 2 apuntaba por error a bop.dipucordoba.es (Diputación de
+    # Córdoba, ESPAÑA); corregido en la Etapa 5 al sitio real de Córdoba,
+    # Argentina. Sin `fecha` en config, usa la fecha de hoy en cada
+    # corrida. `bop-cordoba-scrapy` (España) sigue registrado como
+    # conector de referencia, sin usarse acá (ver spec.md de la Etapa 5).
     conector:
-      tipo: bop-cordoba-scrapy
+      tipo: boletin-cba-pdf-diario
       frecuencia_minutos: 1440
       config:
-        url_template: "https://bop.dipucordoba.es/dia/{fecha}"
+        url_template: "https://boletinoficial.cba.gov.ar/wp-content/4p96humuzp/{anio}/{mes}/{seccion}_Secc_{ddmmyy}.pdf"
+        secciones: [1, 2, 3, 4, 5]
   - clave: carlos-paz-municipal
     nombre: Boletín Municipal de Carlos Paz
   - clave: noetinger-municipal

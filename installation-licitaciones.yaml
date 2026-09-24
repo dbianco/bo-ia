@@ -1,0 +1,47 @@
+# Segunda instalación temática (Etapa 5 — segundo vertical, ver sección 8
+# de docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md).
+# Licitaciones argentinas: comprar.gob.ar (nacional) + Boletín Oficial de
+# Córdoba, Argentina (provincial, sección 4). Corre como un deployment
+# independiente del de "Boletines Córdoba" — ver
+# docker-compose.licitaciones.override.yml y .env.licitaciones.example.
+
+nombre: Licitaciones Argentina
+# Sin datos de ejemplo del Boletín (son específicos de ese vertical, ver
+# src/seed/seed.py): esta instalación se alimenta solo de sus conectores.
+seed: false
+
+fuentes:
+  - clave: comprar-ar-nacional
+    nombre: Comprar.ar (Argentina Compra) — Convocatorias nacionales
+    conector:
+      tipo: comprar-gob-ar-csv
+      frecuencia_minutos: 43200 # el dataset se actualiza semestralmente
+      config:
+        csv_url: "https://infra.datos.gob.ar/catalog/jgm/dataset/4/distribution/4.21/download/Convocatorias.csv"
+        anio_desde: 2026
+        # Gap conocido y aceptado: el conector no lleva cursor, siempre
+        # arranca desde el principio del CSV — este límite ve SIEMPRE las
+        # mismas primeras 500 filas que matchean `anio_desde`, nunca las
+        # siguientes (cobertura parcial permanente, no progresiva). Una
+        # corrida real sin límite llegó a más de 5600 documentos (cada
+        # uno con su propio embedding real por CPU) antes de cancelarla
+        # manualmente durante la verificación de esta etapa — decisión
+        # consciente de acotar el costo de cada corrida por sobre la
+        # cobertura completa del dataset.
+        limite_filas: 500
+  - clave: cba-provincial-licitaciones
+    nombre: Boletín Oficial de Córdoba — Licitaciones y Contrataciones
+    conector:
+      tipo: boletin-cba-pdf-diario
+      frecuencia_minutos: 1440
+      config:
+        url_template: "https://boletinoficial.cba.gov.ar/wp-content/4p96humuzp/{anio}/{mes}/{seccion}_Secc_{ddmmyy}.pdf"
+        secciones: [4]
+
+filtros:
+  - clave: organismo
+    etiqueta: Organismo
+    tipo: seleccion
+  - clave: monto
+    etiqueta: Monto estimado
+    tipo: rango_numerico

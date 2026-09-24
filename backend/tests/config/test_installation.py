@@ -46,6 +46,16 @@ def test_cargar_installation_config_valido(tmp_path: Path) -> None:
     assert [f.clave for f in config.fuentes] == ["cordoba-provincial", "carlos-paz-municipal"]
     assert isinstance(config.filtros[0], FiltroSeleccion)
     assert isinstance(config.filtros[2], FiltroRangoNumerico)
+    assert config.seed is True  # default: no cambia el comportamiento existente
+
+
+def test_cargar_installation_config_con_seed_false(tmp_path: Path) -> None:
+    ruta = tmp_path / "installation.yaml"
+    ruta.write_text(YAML_VALIDO.replace("nombre: Boletines Córdoba", "nombre: Licitaciones\nseed: false"), encoding="utf-8")
+
+    config = cargar_installation_config(ruta)
+
+    assert config.seed is False
 
 
 def test_cargar_installation_config_archivo_inexistente(tmp_path: Path) -> None:
