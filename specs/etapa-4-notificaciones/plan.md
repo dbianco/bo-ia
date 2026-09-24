@@ -25,7 +25,7 @@ Fuente: `spec.md` de esta feature
 
 ## Project Structure
 
-Lista inicial; se actualiza con el nombre real de la migración y el árbol final antes de `verify`.
+Árbol final, confirmado en `verify`.
 
 Modificados:
 
@@ -34,12 +34,13 @@ Modificados:
 - `backend/src/api/suscripciones.py` (acepta `canales` al crear una suscripción, valida contra el conjunto fijo)
 - `backend/src/api/main.py` (registra el router de notificaciones)
 - `.env.example` (variables `SMTP_*`)
+- `docker-compose.yml` (propaga `SMTP_*` al contenedor `backend`; no estaba en la lista inicial)
 - `README.md`
 - `backend/tests/test_migrations.py`
 
 Nuevos:
 
-- `backend/src/db/migrations/versions/<rev>_create_entregas_notificacion.py`
+- `backend/src/db/migrations/versions/5254089ba99e_create_entregas_notificacion.py`
 - `backend/src/notifications/__init__.py`
 - `backend/src/notifications/email.py` (`enviar_correo`, `EnvioCorreoFallido`)
 - `backend/src/notifications/dispatcher.py` (`crear_entregas_para_match`)

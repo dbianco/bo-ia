@@ -315,10 +315,49 @@ class EvaluacionMatch(Base):
     filtros_aplicados: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     fecha_evaluacion: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    documento: Mapped[Documento] = relationship()
     suscripcion: Mapped[Suscripcion] = relationship(back_populates="matches")
+    entregas: Mapped[list[EntregaNotificacion]] = relationship(
+        back_populates="match", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint(
             "documento_id", "suscripcion_id", name="uq_evaluacion_match_documento_suscripcion"
         ),
+    )
+
+
+ESTADOS_ENTREGA = ("pendiente", "entregada", "fallida")
+CANALES_NOTIFICACION = ("bandeja", "correo")
+
+
+class EntregaNotificacion(Base):
+    """Un intento de notificar un match por un canal (sección 4.6 del
+    design spec, Etapa 4): a lo sumo una entrega por par (match, canal).
+    `reintentos` queda en el modelo para un reintento manual futuro; en
+    esta etapa nada lo incrementa todavía (no hay reintento automático,
+    ver `spec.md`)."""
+
+    __tablename__ = "entregas_notificacion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(
+        ForeignKey("evaluaciones_match.id", ondelete="CASCADE"), nullable=False
+    )
+    canal: Mapped[str] = mapped_column(String(16), nullable=False)
+    estado: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pendiente")
+    fecha_intento: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reintentos: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    error_proveedor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    match: Mapped[EvaluacionMatch] = relationship(back_populates="entregas")
+
+    __table_args__ = (
+        CheckConstraint(f"canal IN {CANALES_NOTIFICACION}", name="ck_entrega_notificacion_canal"),
+        CheckConstraint(f"estado IN {ESTADOS_ENTREGA}", name="ck_entrega_notificacion_estado"),
+        UniqueConstraint("match_id", "canal", name="uq_entrega_notificacion_match_canal"),
     )

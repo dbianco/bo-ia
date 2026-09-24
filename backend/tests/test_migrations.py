@@ -63,8 +63,9 @@ def test_each_revision_downgrades_one_step_cleanly(alembic_config: Config) -> No
     command.upgrade(alembic_config, "head")
     # boletines, fragmentos, tags/fragmento_tags, valoraciones, texto_tsv,
     # generalización a documentos/fuentes (Etapa 1), ejecuciones_fuente
-    # (Etapa 2), usuarios/suscripciones (Etapa 3).
-    for _ in range(8):
+    # (Etapa 2), usuarios/suscripciones (Etapa 3), entregas_notificacion
+    # (Etapa 4).
+    for _ in range(9):
         command.downgrade(alembic_config, "-1")
     command.upgrade(alembic_config, "head")
 

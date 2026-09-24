@@ -11,6 +11,7 @@ Motor de búsqueda semántica y monitoreo reutilizable entre temáticas. Esta in
 - **Feature Etapa 1 (spec-kit / SDD):** [specs/etapa-1-nucleo-generico-documento/](specs/etapa-1-nucleo-generico-documento/) — generalización del núcleo (`Documento`, `fuentes`, `installation.yaml`, filtros declarados).
 - **Feature Etapa 2 (spec-kit / SDD):** [specs/etapa-2-ingesta-operativa/](specs/etapa-2-ingesta-operativa/) — scheduler, interfaz de conector, `EjecucionFuente` y el primer conector real (BOP Córdoba, Scrapy + PDF).
 - **Feature Etapa 3 (spec-kit / SDD):** [specs/etapa-3-clientes-suscripciones/](specs/etapa-3-clientes-suscripciones/) — autenticación con sesiones, suscripciones y evaluación síncrona de documentos nuevos.
+- **Feature Etapa 4 (spec-kit / SDD):** [specs/etapa-4-notificaciones/](specs/etapa-4-notificaciones/) — entrega de notificaciones (bandeja interna, correo por SMTP).
 - **Checklist de accesibilidad:** [backend/tests/manual/accessibility-checklist.md](backend/tests/manual/accessibility-checklist.md) (WCAG 2.1 AA).
 
 ## Clientes y suscripciones (Etapa 3)
@@ -27,7 +28,20 @@ curl -b cookies.txt -X POST http://localhost:9101/v1/suscripciones \
   -d '{"texto_busqueda": "licitaciones de obra vial", "filtros": {"municipio": "Carlos Paz"}}'
 ```
 
-Cuando termina la ingesta de un documento genuinamente nuevo, el sistema lo evalúa contra cada suscripción activa (síncrono, dentro de `ingerir_documento`): aplica primero los filtros de la suscripción, y si pasa, compara su embedding con los fragmentos del documento. Un match queda registrado en `evaluaciones_match` con score, filtros aplicados y fecha — sin enviar ninguna notificación todavía (eso es la Etapa 4).
+Cuando termina la ingesta de un documento genuinamente nuevo, el sistema lo evalúa contra cada suscripción activa (síncrono, dentro de `ingerir_documento`): aplica primero los filtros de la suscripción, y si pasa, compara su embedding con los fragmentos del documento. Un match queda registrado en `evaluaciones_match` con score, filtros aplicados y fecha, y dispara sus notificaciones (Etapa 4, ver abajo).
+
+## Notificaciones (Etapa 4)
+
+Cada match crea una `EntregaNotificacion` por cada canal declarado en la suscripción (`canales: ["bandeja", "correo"]` al crearla; por defecto, solo `"bandeja"`). "bandeja" queda entregada de inmediato — es solo una fila consultable vía API. "correo" intenta un envío real por SMTP, configurado enteramente por variables de entorno (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` en `.env.example`); si SMTP no está configurado o el envío falla, la entrega queda `fallida` con el motivo, sin interrumpir la ingesta ni el resto de la evaluación.
+
+**Sin reintento automático todavía**: una entrega fallida no se reintenta sola (gap documentado en `specs/etapa-4-notificaciones/spec.md`).
+
+```bash
+curl -b cookies.txt -X POST http://localhost:9101/v1/suscripciones \
+  -H 'content-type: application/json' \
+  -d '{"texto_busqueda": "licitaciones de obra vial", "filtros": {}, "canales": ["bandeja", "correo"]}'
+curl -b cookies.txt http://localhost:9101/v1/notificaciones   # bandeja de avisos propia
+```
 
 ## Configuración de instalación
 
@@ -75,6 +89,7 @@ Endpoints disponibles en el backend (`http://localhost:9101`):
 | `POST /v1/suscripciones/{id}/pausar` | Pausa una suscripción propia |
 | `POST /v1/suscripciones/{id}/reanudar` | Reanuda una suscripción propia |
 | `DELETE /v1/suscripciones/{id}` | Borra una suscripción propia |
+| `GET /v1/notificaciones` | Bandeja de avisos propia (requiere sesión) |
 | `GET /health` | Chequeo de salud |
 
 ## Estructura del repositorio

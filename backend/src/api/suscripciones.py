@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from src.api.deps import get_embedder, get_installation_config, get_session, get_usuario_actual
 from src.config.installation import InstallationConfig
-from src.db.models import Suscripcion, Usuario
+from src.db.models import CANALES_NOTIFICACION, Suscripcion, Usuario
 from src.processor.embeddings import EmbeddingProvider
 from src.search.filters import FiltroNoDeclarado, ValorDeFiltroInvalido, construir_filtros_suscripcion
 
@@ -21,6 +21,7 @@ router = APIRouter()
 class SuscripcionEntrada(BaseModel):
     texto_busqueda: str = Field(min_length=1)
     filtros: dict[str, str] = Field(default_factory=dict)
+    canales: list[str] = Field(default_factory=list)
 
 
 class SuscripcionSalida(BaseModel):
@@ -28,6 +29,7 @@ class SuscripcionSalida(BaseModel):
     texto_busqueda: str
     filtros: dict
     estado: str
+    canales: list[str]
 
 
 def _salida(suscripcion: Suscripcion) -> SuscripcionSalida:
@@ -36,6 +38,7 @@ def _salida(suscripcion: Suscripcion) -> SuscripcionSalida:
         texto_busqueda=suscripcion.texto_busqueda,
         filtros=suscripcion.filtros,
         estado=suscripcion.estado,
+        canales=suscripcion.canales,
     )
 
 
@@ -61,12 +64,19 @@ def crear_suscripcion(
     except ValorDeFiltroInvalido as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    canales_invalidos = set(entrada.canales) - set(CANALES_NOTIFICACION)
+    if canales_invalidos:
+        raise HTTPException(
+            status_code=422, detail=f"Canal no soportado: {', '.join(sorted(canales_invalidos))}"
+        )
+
     suscripcion = Suscripcion(
         usuario_id=usuario.id,
         texto_busqueda=entrada.texto_busqueda,
         embedding=embedder.embed_query(entrada.texto_busqueda),
         filtros=filtros_snapshot,
         estado="activa",
+        canales=entrada.canales,
     )
     session.add(suscripcion)
     session.flush()

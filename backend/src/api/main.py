@@ -12,6 +12,7 @@ from src.api.deps import get_embedder, get_installation_config
 from src.api.feedback import router as feedback_router
 from src.api.fuentes import router as fuentes_router
 from src.api.ingest import router as ingest_router
+from src.api.notificaciones import router as notificaciones_router
 from src.api.search import router as search_router
 from src.api.suscripciones import router as suscripciones_router
 from src.config.installation import upsert_fuentes
@@ -51,6 +52,7 @@ app.include_router(config_router)
 app.include_router(fuentes_router)
 app.include_router(auth_router)
 app.include_router(suscripciones_router)
+app.include_router(notificaciones_router)
 
 
 @app.get("/health")

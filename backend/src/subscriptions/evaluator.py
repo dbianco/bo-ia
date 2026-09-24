@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.db.models import Documento, EvaluacionMatch, Fragmento, Suscripcion
+from src.notifications.dispatcher import crear_entregas_para_match
 from src.processor.threshold import umbral_configurado
 from src.search.filters import cumple_filtros
 
@@ -58,14 +59,17 @@ def evaluar_documento(session: Session, documento: Documento) -> None:
             )
         )
         if ya_existe is None:
-            session.add(
-                EvaluacionMatch(
-                    documento_id=documento.id,
-                    suscripcion_id=suscripcion.id,
-                    score=round(score, 4),
-                    filtros_aplicados=suscripcion.filtros,
-                    fecha_evaluacion=ahora,
-                )
+            match = EvaluacionMatch(
+                documento_id=documento.id,
+                suscripcion_id=suscripcion.id,
+                score=round(score, 4),
+                filtros_aplicados=suscripcion.filtros,
+                fecha_evaluacion=ahora,
             )
+            session.add(match)
+            session.flush()  # asigna match.id, lo necesita crear_entregas_para_match
+            match.suscripcion = suscripcion  # ya está en memoria, evita un round-trip
+            match.documento = documento
+            crear_entregas_para_match(session, match)  # Etapa 4, FR-002
 
     session.commit()

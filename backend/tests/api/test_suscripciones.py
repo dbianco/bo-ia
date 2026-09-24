@@ -133,3 +133,38 @@ def test_borrar_una_suscripcion_ajena_devuelve_404(client: TestClient) -> None:
     respuesta = client.delete(f"/v1/suscripciones/{sid}")
 
     assert respuesta.status_code == 404
+
+
+# T009: canales al crear una suscripción (FR-010, SC-007)
+
+
+def test_crear_suscripcion_con_canales_validos(client: TestClient) -> None:
+    _registrar_y_loguear(client, "uno@example.org")
+
+    respuesta = client.post(
+        "/v1/suscripciones",
+        json={"texto_busqueda": "texto", "filtros": {}, "canales": ["bandeja", "correo"]},
+    )
+
+    assert respuesta.status_code == 201
+    assert sorted(respuesta.json()["canales"]) == ["bandeja", "correo"]
+
+
+def test_crear_suscripcion_sin_canales_no_declara_ninguno(client: TestClient) -> None:
+    _registrar_y_loguear(client, "uno@example.org")
+
+    respuesta = client.post("/v1/suscripciones", json={"texto_busqueda": "texto", "filtros": {}})
+
+    assert respuesta.status_code == 201
+    assert respuesta.json()["canales"] == []
+
+
+def test_crear_suscripcion_con_canal_invalido_devuelve_422(client: TestClient) -> None:
+    _registrar_y_loguear(client, "uno@example.org")
+
+    respuesta = client.post(
+        "/v1/suscripciones",
+        json={"texto_busqueda": "texto", "filtros": {}, "canales": ["whatsapp"]},
+    )
+
+    assert respuesta.status_code == 422
