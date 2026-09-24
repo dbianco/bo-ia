@@ -33,63 +33,66 @@
     </div>
 
     <form role="search" hx-get="/resultados" hx-target="#resultados" hx-indicator="#buscando">
-      <div>
-        <label for="q">Consulta</label>
-        <input type="text" id="q" name="q" required autocomplete="off" placeholder="ej: presupuesto provincial">
+      <label for="q" class="sr-only">Consulta</label>
+      <div class="buscador">
+        <textarea
+          id="q"
+          name="q"
+          rows="1"
+          required
+          autocomplete="off"
+          placeholder="ej: presupuesto provincial para obras de infraestructura vial"
+        ></textarea>
+        <button type="submit" class="buscar-btn" aria-label="Buscar">⌕</button>
       </div>
-      <div class="form-fechas">
-        <div>
+      <div class="barra-secundaria">
+        <div class="campo-fecha">
           <label for="date_from">Desde</label>
-          <div class="campo-fecha">
-            <input type="date" id="date_from" name="date_from">
-            <button type="button" class="borrar-fecha" data-target="date_from" aria-label="Borrar fecha desde" hidden>×</button>
-          </div>
+          <input type="date" id="date_from" name="date_from">
+          <button type="button" class="borrar-fecha" data-target="date_from" aria-label="Borrar fecha desde" hidden>×</button>
         </div>
-        <div>
+        <div class="campo-fecha">
           <label for="date_to">Hasta</label>
-          <div class="campo-fecha">
-            <input type="date" id="date_to" name="date_to">
-            <button type="button" class="borrar-fecha" data-target="date_to" aria-label="Borrar fecha hasta" hidden>×</button>
-          </div>
+          <input type="date" id="date_to" name="date_to">
+          <button type="button" class="borrar-fecha" data-target="date_to" aria-label="Borrar fecha hasta" hidden>×</button>
         </div>
+        <fieldset class="modo-busqueda">
+          <legend>Modo de búsqueda</legend>
+          <div class="opciones-modo">
+            <label class="opcion-modo" title="Busca por significado, aunque no coincidan las palabras exactas.">
+              <input type="radio" name="mode" value="semantic" checked>
+              <span>Semántica</span>
+            </label>
+            <label class="opcion-modo" title="Semántica combinada con coincidencia de texto exacto.">
+              <input type="radio" name="mode" value="hybrid">
+              <span>Híbrida</span>
+            </label>
+            <label class="opcion-modo" title="Todos los resultados, sin filtrar por confianza.">
+              <input type="radio" name="mode" value="all">
+              <span>Todo</span>
+            </label>
+          </div>
+        </fieldset>
+        {% if filtros %}
+        <details class="filtros-disclosure">
+          <summary>Filtros</summary>
+          <div class="filtros-campos">
+            {% for f in filtros %}
+            <div>
+              <label for="filtro-{{ f.clave }}">{{ f.etiqueta }}</label>
+              <input
+                type="text"
+                id="filtro-{{ f.clave }}"
+                name="filtro.{{ f.clave }}"
+                autocomplete="off"
+                placeholder="{{ 'min,max' if f.tipo == 'rango_numerico' else f.etiqueta }}"
+              >
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
       </div>
-      {% if filtros %}
-      <fieldset class="filtros-instalacion">
-        <legend>Filtros</legend>
-        <div class="opciones-modo">
-          {% for f in filtros %}
-          <div>
-            <label for="filtro-{{ f.clave }}">{{ f.etiqueta }}</label>
-            <input
-              type="text"
-              id="filtro-{{ f.clave }}"
-              name="filtro.{{ f.clave }}"
-              autocomplete="off"
-              placeholder="{{ 'min,max' if f.tipo == 'rango_numerico' else f.etiqueta }}"
-            >
-          </div>
-          {% endfor %}
-        </div>
-      </fieldset>
-      {% endif %}
-      <fieldset class="modo-busqueda">
-        <legend>Modo de búsqueda</legend>
-        <div class="opciones-modo">
-          <label class="opcion-modo" title="Busca por significado, aunque no coincidan las palabras exactas.">
-            <input type="radio" name="mode" value="semantic" checked>
-            <span>Semántica</span>
-          </label>
-          <label class="opcion-modo" title="Semántica combinada con coincidencia de texto exacto.">
-            <input type="radio" name="mode" value="hybrid">
-            <span>Híbrida</span>
-          </label>
-          <label class="opcion-modo" title="Todos los resultados, sin filtrar por confianza.">
-            <input type="radio" name="mode" value="all">
-            <span>Todo</span>
-          </label>
-        </div>
-      </fieldset>
-      <button type="submit">Buscar</button>
       <span id="buscando" class="htmx-indicator" role="status">Buscando…</span>
     </form>
 
@@ -97,5 +100,6 @@
   </main>
   <script src="/static/theme.js"></script>
   <script src="/static/fechas.js"></script>
+  <script src="/static/buscador.js"></script>
 </body>
 </html>

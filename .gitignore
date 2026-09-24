@@ -3,6 +3,8 @@ docs/jurisprudencia.docx
 .env
 .env.licitaciones
 .venv/
+.superpowers/
+.playwright-mcp/
 __pycache__/
 *.pyc
 .pytest_cache/
