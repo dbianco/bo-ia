@@ -14,7 +14,7 @@ from src.db.models import EjecucionFuente, Fuente
 from src.ingestor.contract import ingerir_documento
 from src.processor.embeddings import EmbeddingProvider
 
-logger = logging.getLogger("bo-ia.scheduler")
+logger = logging.getLogger("contextcrawl.scheduler")
 
 
 def _ahora() -> datetime.datetime:

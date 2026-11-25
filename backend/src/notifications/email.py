@@ -23,7 +23,7 @@ def _config_smtp() -> tuple[str, int, str | None, str | None, str]:
     puerto = int(os.environ.get("SMTP_PORT", "587"))
     usuario = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASSWORD")
-    remitente = os.environ.get("SMTP_FROM") or usuario or "no-reply@bo-ia.local"
+    remitente = os.environ.get("SMTP_FROM") or usuario or "no-reply@contextcrawl.local"
     return host, puerto, usuario, password, remitente
 
 

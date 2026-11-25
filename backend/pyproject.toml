@@ -1,5 +1,5 @@
 [project]
-name = "bo-ia-backend"
+name = "contextcrawl-backend"
 version = "0.1.0"
 description = "Backend del MVP de búsqueda semántica del Boletín Oficial (ingestor + procesador + API)"
 requires-python = ">=3.12"

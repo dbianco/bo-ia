@@ -16,7 +16,7 @@ from src.config.installation import InstallationConfig, cargar_installation_conf
 from src.db.models import Usuario
 from src.processor.embeddings import EmbeddingProvider, SentenceTransformerEmbeddingProvider
 
-COOKIE_SESION = "bo_ia_sesion"
+COOKIE_SESION = "contextcrawl_sesion"
 
 
 @lru_cache

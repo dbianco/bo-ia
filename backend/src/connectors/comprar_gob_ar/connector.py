@@ -23,14 +23,14 @@ from src.ingestor.contract import DocumentoNormalizado
 VERSION = "comprar-gob-ar-csv-v1"
 
 TIMEOUT_DEFAULT = 60
-USER_AGENT = "bo-ia-connector/1.0"
+USER_AGENT = "contextcrawl-connector/1.0"
 
 # comprar.gob.ar no expone una URL de detalle estable por proceso (ver
 # spec.md, Research): se usa la página del dataset abierto como
 # `url_fuente` para todos los documentos, una limitación conocida.
 URL_FUENTE_DATASET = "https://www.datos.gob.ar/dataset/sistema-de-contrataciones-electronicas"
 
-logger = logging.getLogger("bo-ia.connectors.comprar_gob_ar")
+logger = logging.getLogger("contextcrawl.connectors.comprar_gob_ar")
 
 
 def _parsear_fecha(valor: str) -> date:

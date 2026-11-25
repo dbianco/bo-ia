@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 
 BACKEND_URL = os.environ.get("BACKEND_INTERNAL_URL", "http://backend:8000")
 
-app = FastAPI(title="bo-ia web")
+app = FastAPI(title="ContextCrawl web")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
