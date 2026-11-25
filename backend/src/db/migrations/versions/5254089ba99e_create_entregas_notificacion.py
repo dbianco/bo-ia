@@ -1,7 +1,7 @@
 """create entregas_notificacion
 
 Etapa 4 (notificaciones, ver sección 4.6 de
-docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md).
+docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md).
 
 Revision ID: 5254089ba99e
 Revises: 561281315b74

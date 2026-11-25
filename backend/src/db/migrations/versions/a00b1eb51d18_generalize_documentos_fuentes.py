@@ -1,7 +1,7 @@
 """generalize boletines to documentos, add fuentes
 
 Etapa 1 del plan de generalización (ver sección 8 de
-docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md):
+docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md):
 - crea `fuentes`, con backfill desde los valores distintos de `jurisdiccion`.
 - renombra `boletines` -> `documentos` y sus columnas al vocabulario
   genérico; agrega `fuente_id`, `metadata` (JSONB + índice GIN) y

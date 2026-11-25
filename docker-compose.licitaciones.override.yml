@@ -8,4 +8,4 @@ services:
   backend:
     volumes:
       - model-cache:${EMBEDDING_CACHE_DIR}
-      - ./installation-licitaciones.yaml:${INSTALLATION_CONFIG}:ro
+      - ./config/installation-licitaciones.yaml:${INSTALLATION_CONFIG}:ro

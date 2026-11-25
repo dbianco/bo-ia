@@ -1,5 +1,5 @@
 """Modelos SQLAlchemy (Etapa 1: núcleo genérico, ver sección 8 del design
-spec `docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md`).
+spec `docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md`).
 
 Los tags a nivel de documento no tienen tabla propia: se derivan de la
 unión de los tags de sus fragmentos (`fragmento_tags`). `origen` y `valor`

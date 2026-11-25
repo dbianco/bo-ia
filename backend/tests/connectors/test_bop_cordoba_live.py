@@ -10,7 +10,7 @@ from src.ingestor.contract import DocumentoNormalizado
 
 @pytest.mark.live
 def test_conector_bop_contra_el_sitio_real() -> None:
-    """Usa la misma fecha que el PoC (docs/superpowers/reports/2026-09-23-scraping-poc.md),
+    """Usa la misma fecha que el PoC (docs/reports/2026-09-23-scraping-poc.md),
     donde ya se confirmó que hay 30 anuncios publicados."""
     conector = ConectorBopCordoba()
     config = {
