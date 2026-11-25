@@ -19,7 +19,7 @@ from src.config.installation import upsert_fuentes
 from src.scheduler import detener_scheduler, iniciar_scheduler
 from src.seed.seed import sembrar_si_vacio
 
-logger = logging.getLogger("bo-ia")
+logger = logging.getLogger("contextcrawl")
 
 
 @asynccontextmanager
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     detener_scheduler(scheduler)
 
 
-app = FastAPI(title="bo-ia backend", lifespan=lifespan)
+app = FastAPI(title="ContextCrawl backend", lifespan=lifespan)
 app.include_router(search_router)
 app.include_router(feedback_router)
 app.include_router(ingest_router)

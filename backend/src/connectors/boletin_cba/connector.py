@@ -36,7 +36,7 @@ VERSION = "boletin-cba-pdf-diario-v1"
 
 TIMEOUT_DEFAULT = 60
 REINTENTOS_DEFAULT = 2
-USER_AGENT = "bo-ia-connector/1.0"
+USER_AGENT = "contextcrawl-connector/1.0"
 CURL_BIN = "curl"
 
 SECCIONES = {
@@ -47,7 +47,7 @@ SECCIONES = {
     5: "5° Sección: Municipalidades y Comunas: Legislación - Normativas",
 }
 
-logger = logging.getLogger("bo-ia.connectors.boletin_cba")
+logger = logging.getLogger("contextcrawl.connectors.boletin_cba")
 
 
 def construir_url(url_template: str, *, seccion: int, fecha: date) -> str:

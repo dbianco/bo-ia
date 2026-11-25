@@ -13,7 +13,7 @@ def _config_smtp(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SMTP_PORT", "587")
     monkeypatch.setenv("SMTP_USER", "bo-ia")
     monkeypatch.setenv("SMTP_PASSWORD", "secreta")
-    monkeypatch.setenv("SMTP_FROM", "avisos@bo-ia.local")
+    monkeypatch.setenv("SMTP_FROM", "avisos@contextcrawl.local")
 
 
 def test_enviar_correo_exitoso_usa_smtp_configurado() -> None:

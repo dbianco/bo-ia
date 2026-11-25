@@ -20,7 +20,7 @@ from src.connectors.runner import ejecutar_conector
 from src.db.models import Fuente
 from src.processor.embeddings import EmbeddingProvider
 
-logger = logging.getLogger("bo-ia.scheduler")
+logger = logging.getLogger("contextcrawl.scheduler")
 
 
 def _ejecutar_job(

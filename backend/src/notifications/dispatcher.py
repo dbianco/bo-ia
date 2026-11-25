@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from src.db.models import EntregaNotificacion, EvaluacionMatch
 from src.notifications.email import EnvioCorreoFallido, enviar_correo
 
-logger = logging.getLogger("bo-ia.notifications")
+logger = logging.getLogger("contextcrawl.notifications")
 
 CANAL_DEFAULT = ("bandeja",)
 
