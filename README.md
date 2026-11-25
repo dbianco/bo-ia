@@ -1,9 +1,41 @@
 # ContextCrawl
 
-[![CI](https://github.com/dbianco/bo-ia/actions/workflows/ci.yml/badge.svg)](https://github.com/dbianco/bo-ia/actions/workflows/ci.yml)
+[![CI](https://github.com/dbianco/ContextCrawl/actions/workflows/ci.yml/badge.svg)](https://github.com/dbianco/ContextCrawl/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A semantic search and monitoring engine that can be reused across subject areas. This installation runs the vertical for the Boletín Oficial (official gazette) of the Province of Córdoba, Argentina.
+ContextCrawl is a semantic search and monitoring engine for sources that publish documents on a regular basis. It collects new documents from each source, lets people search them by meaning rather than exact words, and alerts subscribers when something relevant to them is published.
+
+## What ContextCrawl is
+
+Official gazettes, public tender portals and similar sources publish hundreds of notices a day, as PDFs or open datasets, with little more than a date to search by. Finding what matters means reading them every day, and a keyword search misses any notice worded differently from the query.
+
+ContextCrawl started as a semantic search over the Boletín Oficial (official gazette) of the Province of Córdoba, Argentina, and grew into one shared engine that runs independent thematic installations. Each installation covers one subject area, with its own sources, filters, database and users.
+
+### What it does
+
+- **Collects documents on a schedule.** A connector per source fetches new publications and turns them into a common document format. The engine knows nothing about a source's HTML, PDFs or APIs.
+- **Indexes them for search by meaning.** Each document is split into fragments and embedded locally with `Qwen/Qwen3-Embedding-0.6B`, stored in PostgreSQL with pgvector. Adding documents never requires retraining a model.
+- **Searches by meaning.** Semantic search with a similarity threshold is the default; a hybrid mode fuses it with full-text search. Results can be narrowed by date and by the filters the installation declares, and every result keeps its original text and source URL.
+- **Monitors on behalf of users.** A user saves a search as a subscription. Every new document is evaluated against the active subscriptions as it is ingested, and a match is recorded with its score.
+- **Notifies.** Each match is delivered to the user's inbox in the app and, optionally, by email.
+- **Collects feedback.** Users can rate a result with a thumbs up or down.
+
+### One engine, several installations
+
+A new subject area is added through configuration plus connectors, not by forking the engine. An `installation.yaml` file names the installation and declares its sources and search filters; only a genuinely new kind of source needs code, in the form of a connector.
+
+Two installations run today from the same code:
+
+| Installation | Sources | Filters |
+|---|---|---|
+| **Boletines Córdoba** | Boletín Oficial of the Province of Córdoba (daily PDFs, five sections), plus municipal gazettes loaded manually | province, municipality |
+| **Licitaciones Argentina** | National tenders from the comprar.gob.ar open dataset, and the procurement section of the Córdoba gazette | contracting body, estimated amount |
+
+Each installation is deployed on its own, with its own database, which keeps subject areas isolated without multi-tenancy; within an installation there are multiple users. Case law is a third use case the design anticipates, but it has not been built.
+
+### Current state
+
+The backend covers the full cycle: scheduled ingestion, search, accounts, subscriptions and notifications. The web UI covers search and result feedback only; accounts and subscriptions are managed through the API for now. Failed email deliveries are not retried automatically. ContextCrawl presents documents as searchable, traceable sources and does not replace the original publication or constitute legal advice.
 
 ## Documentation
 
