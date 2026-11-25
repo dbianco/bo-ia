@@ -11,7 +11,7 @@ ContextCrawl is a semantic search and monitoring engine for sources that publish
 
 ## Language
 
-Existing identifiers, comments, API paths, DB tables, log messages and test names are mostly in Spanish. New source code is written in English (see the user's global instructions). Do not rename existing Spanish names, endpoints or columns as a side effect of another change. Specs and design docs under `specs/` and `docs/superpowers/` are in Spanish. `README.md` and `docs/plans/` are in English.
+Existing identifiers, comments, API paths, DB tables, log messages and test names are mostly in Spanish. New source code is written in English (see the user's global instructions). Do not rename existing Spanish names, endpoints or columns as a side effect of another change. Specs and design docs under `docs/specs/`, `docs/design/` and `docs/reports/` are in Spanish. `README.md` and `docs/plans/` are in English.
 
 ## Commands
 
@@ -39,7 +39,7 @@ Test markers:
 
 CI runs `pytest -m "not docker and not live"` (so it includes `slow`), then a separate compose smoke job.
 
-Full stack: `docker compose up --build` (db 9100, backend 9101, web 9102). Source is copied into the images, so code changes need `--build`. The `installation.yaml` file is mounted read-only and read once per process, so restart `backend` after editing it.
+Full stack: `docker compose up --build` (db 9100, backend 9101, web 9102). Source is copied into the images, so code changes need `--build`. The `config/installation.yaml` file is mounted read-only and read once per process, so restart `backend` after editing it.
 
 Second installation, in parallel on ports 93xx:
 
@@ -110,5 +110,5 @@ Authentication uses server-side sessions with an HttpOnly cookie. `GET /v1/searc
 
 ## Workflow and plans
 
-- The repo is registered with the SDD Orchestrator (`.sdd/config.json`, advisory `warn` mode). Follow the `sdd-workflow` skill. Past feature artifacts are in `specs/<feature>/`.
+- The repo is registered with the SDD Orchestrator (`.sdd/config.json`, advisory `warn` mode). Follow the `sdd-workflow` skill. Past feature artifacts are in `docs/specs/<feature>/`.
 - Planned features are in `docs/plans/` (start with its README). New benchmarks and tests for them must be offline (no network, GPU, Docker or model download), deterministic from a seed, based on generated data, and compared against a simple reference implementation.

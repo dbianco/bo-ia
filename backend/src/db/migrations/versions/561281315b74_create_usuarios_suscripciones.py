@@ -1,7 +1,7 @@
 """create usuarios, sesiones, suscripciones, evaluaciones_match
 
 Etapa 3 (clientes y suscripciones, ver sección 4.5 de
-docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md).
+docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md).
 
 Revision ID: 561281315b74
 Revises: beff2319f387

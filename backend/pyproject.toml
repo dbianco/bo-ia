@@ -14,7 +14,7 @@ dependencies = [
     "alembic>=1.14,<2.0",
     "pydantic-settings>=2.6,<3.0",
     "pyyaml>=6.0,<7.0",  # parsea installation.yaml (config de instalación); no hay parser YAML en la librería estándar
-    "scrapy>=2.19,<3.0",  # motor de conectores (Etapa 2); recomendado por docs/superpowers/reports/2026-09-23-scraping-poc.md
+    "scrapy>=2.19,<3.0",  # motor de conectores (Etapa 2); recomendado por docs/reports/2026-09-23-scraping-poc.md
     "apscheduler>=3.11,<4.0",  # scheduler in-process (Etapa 2)
     "pypdf>=6.0,<7.0",  # extracción de texto de PDF en el conector del BOP (Etapa 2)
 ]

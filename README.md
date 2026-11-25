@@ -41,15 +41,15 @@ The backend covers the full cycle: scheduled ingestion, search, accounts, subscr
 
 The specs and design documents linked below are written in Spanish.
 
-- **Feature plans:** [docs/plans/](docs/plans/README.md) — plans for the next features (in English): synthetic corpus and benchmark, offline embeddings, subscription matching engine, hybrid ranking engine, crash-safe index and near-duplicate collapsing.
-- **Platform spec:** [docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md](docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md) — motivation, architectural decisions and the detailed design of Etapa 1 (section 8).
-- **Original MVP feature (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — spec, plan, tasks and verification evidence for the Boletín vertical before it was generalized.
-- **Etapa 1 feature (spec-kit / SDD):** [specs/etapa-1-nucleo-generico-documento/](specs/etapa-1-nucleo-generico-documento/) — generalization of the core (`Documento`, `fuentes`, `installation.yaml`, declared filters).
-- **Etapa 2 feature (spec-kit / SDD):** [specs/etapa-2-ingesta-operativa/](specs/etapa-2-ingesta-operativa/) — scheduler, connector interface, `EjecucionFuente` and the first real connector (BOP Córdoba, Scrapy + PDF).
-- **Etapa 3 feature (spec-kit / SDD):** [specs/etapa-3-clientes-suscripciones/](specs/etapa-3-clientes-suscripciones/) — session-based authentication, subscriptions and synchronous evaluation of new documents.
-- **Etapa 4 feature (spec-kit / SDD):** [specs/etapa-4-notificaciones/](specs/etapa-4-notificaciones/) — notification delivery (internal inbox, email over SMTP).
-- **Etapa 5 feature (spec-kit / SDD):** [specs/etapa-5-segundo-vertical/](specs/etapa-5-segundo-vertical/) — second vertical (Argentine public tenders, "licitaciones"), two new connectors and a second real installation running in parallel.
-- **Accessibility checklist:** [backend/tests/manual/accessibility-checklist.md](backend/tests/manual/accessibility-checklist.md) (WCAG 2.1 AA).
+- **Feature plans:** [docs/plans/](docs/plans/README.md) — plans for the next features and the fixes for known defects (in English), with a recommended order and how to judge completion.
+- **Platform spec:** [docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md](docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md) — motivation, architectural decisions and the detailed design of Etapa 1 (section 8).
+- **Original MVP feature (spec-kit / SDD):** [docs/specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](docs/specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — spec, plan, tasks and verification evidence for the Boletín vertical before it was generalized.
+- **Etapa 1 feature (spec-kit / SDD):** [docs/specs/etapa-1-nucleo-generico-documento/](docs/specs/etapa-1-nucleo-generico-documento/) — generalization of the core (`Documento`, `fuentes`, `installation.yaml`, declared filters).
+- **Etapa 2 feature (spec-kit / SDD):** [docs/specs/etapa-2-ingesta-operativa/](docs/specs/etapa-2-ingesta-operativa/) — scheduler, connector interface, `EjecucionFuente` and the first real connector (BOP Córdoba, Scrapy + PDF).
+- **Etapa 3 feature (spec-kit / SDD):** [docs/specs/etapa-3-clientes-suscripciones/](docs/specs/etapa-3-clientes-suscripciones/) — session-based authentication, subscriptions and synchronous evaluation of new documents.
+- **Etapa 4 feature (spec-kit / SDD):** [docs/specs/etapa-4-notificaciones/](docs/specs/etapa-4-notificaciones/) — notification delivery (internal inbox, email over SMTP).
+- **Etapa 5 feature (spec-kit / SDD):** [docs/specs/etapa-5-segundo-vertical/](docs/specs/etapa-5-segundo-vertical/) — second vertical (Argentine public tenders, "licitaciones"), two new connectors and a second real installation running in parallel.
+- **Accessibility checklist:** [docs/accessibility-checklist.md](docs/accessibility-checklist.md) (WCAG 2.1 AA).
 
 ## Clients and subscriptions (Etapa 3)
 
@@ -71,7 +71,7 @@ When the ingestion of a genuinely new document finishes, the system evaluates it
 
 Each match creates one `EntregaNotificacion` per channel declared on the subscription (`canales: ["bandeja", "correo"]` when creating it; the default is `"bandeja"` only). `"bandeja"` (inbox) is delivered immediately — it is just a row you can query through the API. `"correo"` (email) attempts a real SMTP send, configured entirely through environment variables (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` in `.env.example`); if SMTP is not configured or the send fails, the delivery is marked `fallida` with the reason, without interrupting ingestion or the rest of the evaluation.
 
-**No automatic retry yet**: a failed delivery is not retried on its own (gap documented in `specs/etapa-4-notificaciones/spec.md`).
+**No automatic retry yet**: a failed delivery is not retried on its own (gap documented in `docs/specs/etapa-4-notificaciones/spec.md`).
 
 ```bash
 curl -b cookies.txt -X POST http://localhost:9101/v1/suscripciones \
@@ -82,7 +82,7 @@ curl -b cookies.txt http://localhost:9101/v1/notificaciones   # your own notific
 
 ## Installation configuration
 
-`installation.yaml` (repository root) defines the installation name, the initial sources (with their connector, if any) and the filters the search exposes — see `INSTALLATION_CONFIG` in `.env.example`. Adding a new source or filter does not require touching the engine.
+`config/installation.yaml` defines the installation name, the initial sources (with their connector, if any) and the filters the search exposes — see `INSTALLATION_CONFIG` in `.env.example`. Adding a new source or filter does not require touching the engine.
 
 ### Operational ingestion (Etapa 2)
 
@@ -114,7 +114,7 @@ Connectors available today (`backend/src/connectors/registry.py`):
 |---|---|
 | `boletin-cba-pdf-diario` | Direct HTTP (`curl`, see Etapa 5) against `boletinoficial.cba.gov.ar`: predictable PDF URL per section/date, extracts text with `pypdf`. One `DocumentoNormalizado` per (date, section). |
 | `comprar-gob-ar-csv` | Streams the open dataset of national tenders (`Convocatorias.csv`, datos.gob.ar) and produces one `DocumentoNormalizado` per row, filtered by `anio_desde` (Etapa 5). |
-| `bop-cordoba-scrapy` | Scrapy + PDF extraction against the official gazette of the Diputación de Córdoba, **Spain** (`bop.dipucordoba.es`) — the reference connector from Etapa 2, unused by any installation since Etapa 5 (it pointed at the wrong site by mistake; see `specs/etapa-5-segundo-vertical/`). It stays registered and tested, so already-proven code is not deleted. |
+| `bop-cordoba-scrapy` | Scrapy + PDF extraction against the official gazette of the Diputación de Córdoba, **Spain** (`bop.dipucordoba.es`) — the reference connector from Etapa 2, unused by any installation since Etapa 5 (it pointed at the wrong site by mistake; see `docs/specs/etapa-5-segundo-vertical/`). It stays registered and tested, so already-proven code is not deleted. |
 
 Each connector's tests run against local fixtures; tests marked `live` (excluded by default and from CI) run against the real site/dataset.
 
@@ -140,7 +140,7 @@ Endpoints exposed by the backend (`http://localhost:9101`):
 
 ## Second vertical: Argentine public tenders (Etapa 5)
 
-`installation-licitaciones.yaml` is a second real installation, "Licitaciones Argentina", which validates that the engine is reusable without copying code: it declares its own sources (`comprar-ar-nacional`, `cba-provincial-licitaciones`) and its own filters (`organismo`, `monto`) without touching `src/`. It runs as a **second, complete Docker Compose stack in parallel** with the gazette one, with its own database and its own ports:
+`config/installation-licitaciones.yaml` is a second real installation, "Licitaciones Argentina", which validates that the engine is reusable without copying code: it declares its own sources (`comprar-ar-nacional`, `cba-provincial-licitaciones`) and its own filters (`organismo`, `monto`) without touching `src/`. It runs as a **second, complete Docker Compose stack in parallel** with the gazette one, with its own database and its own ports:
 
 ```bash
 cp .env.licitaciones.example .env.licitaciones   # review/adjust ports and POSTGRES_DB if needed
@@ -153,14 +153,14 @@ The override only replaces the volume that mounts `installation.yaml` with `inst
 
 An installation without the Boletín sample data declares `seed: false` in its `installation.yaml` — without this flag, `sembrar_si_vacio` (designed for the original installation) loads its sample data into any new installation with an empty database, regardless of the configuration (a real bug found and fixed in Etapa 5).
 
-`comprar-gob-ar-csv` accepts `limite_filas` to cap how many CSV rows are processed per run — known gap: with no cursor, it always sees the same first N rows that match `anio_desde` and never the following ones (permanently partial coverage if used; see `specs/etapa-5-segundo-vertical/verify-evidence.md`).
+`comprar-gob-ar-csv` accepts `limite_filas` to cap how many CSV rows are processed per run — known gap: with no cursor, it always sees the same first N rows that match `anio_desde` and never the following ones (permanently partial coverage if used; see `docs/specs/etapa-5-segundo-vertical/verify-evidence.md`).
 
 ## Repository structure
 
 - `backend/` — Ingestor, Processor and API (Python/FastAPI), consolidated into a single service. See `backend/src/` (code) and `backend/tests/` (tests).
 - `web/` — search UI (Jinja2 + htmx).
-- `specs/` — spec-kit artifacts (spec, plan, tasks) for the SDD phase workflow.
-- `docs/` — original design spec and reference documentation.
+- `config/` — one installation file per thematic installation.
+- `docs/` — documentation: `plans/` (upcoming features), `specs/` (spec-kit artifacts for the SDD phase workflow), `design/` (design specs) and `reports/` (research reports and proofs of concept).
 
 ## Running locally
 

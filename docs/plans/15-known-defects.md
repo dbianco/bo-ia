@@ -16,7 +16,7 @@ Found by reading the code. The scheduler default was also checked in the source 
 |---|---|---|
 | A. `POST /v1/documentos` and `POST /v1/fuentes/{clave}/ejecutar` require no authentication. | Anyone who can reach the backend can add documents, which are matched and can send email to subscribers, or make it fetch from a source. | `backend/src/api/ingest.py`, `backend/src/api/fuentes.py` |
 | B. Jobs use `IntervalTrigger` with no start time, so the first run is one full interval after startup. | A daily source on a backend restarted every day may never run. The 30-day tender source needs 30 days of uptime. | `backend/src/scheduler/__init__.py` |
-| C. The Córdoba gazette connector writes `jurisdiccion` and `seccion`, while the installation filters on `provincia` and `municipio`. | Filtering a search or a subscription by either excludes every document it collects. | `backend/src/connectors/boletin_cba/connector.py`, `installation.yaml` |
+| C. The Córdoba gazette connector writes `jurisdiccion` and `seccion`, while the installation filters on `provincia` and `municipio`. | Filtering a search or a subscription by either excludes every document it collects. | `backend/src/connectors/boletin_cba/connector.py`, `config/installation.yaml` |
 | D. A document in `estado="error"` counts as already ingested. | It is never retried, so it is never searchable or matched. | `backend/src/ingestor/contract.py` |
 | E. A run in which every item failed is marked `completada`. | A broken source looks healthy in the run history. | `backend/src/connectors/runner.py` |
 | F. The tender connector does not keep the CSV's opening date (`Fecha_de_Apertura`). | The date a user most needs is lost. | `backend/src/connectors/comprar_gob_ar/connector.py` |

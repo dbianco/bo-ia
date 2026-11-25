@@ -1,7 +1,7 @@
 """create ejecuciones_fuente
 
 Etapa 2 (ingesta operativa, ver sección 4.4 de
-docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md):
+docs/design/2026-09-18-plataforma-tematica-reutilizable-design.md):
 registra cada corrida de un conector sobre una fuente.
 
 Revision ID: beff2319f387
