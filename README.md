@@ -41,6 +41,7 @@ The backend covers the full cycle: scheduled ingestion, search, accounts, subscr
 
 The specs and design documents linked below are written in Spanish.
 
+- **Feature plans:** [docs/plans/](docs/plans/README.md) — plans for the next features (in English): synthetic corpus and benchmark, offline embeddings, subscription matching engine, hybrid ranking engine, crash-safe index and near-duplicate collapsing.
 - **Platform spec:** [docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md](docs/superpowers/specs/2026-09-18-plataforma-tematica-reutilizable-design.md) — motivation, architectural decisions and the detailed design of Etapa 1 (section 8).
 - **Original MVP feature (spec-kit / SDD):** [specs/construir-el-mvp-de-busqueda-semantica-del-bolet/](specs/construir-el-mvp-de-busqueda-semantica-del-bolet/) — spec, plan, tasks and verification evidence for the Boletín vertical before it was generalized.
 - **Etapa 1 feature (spec-kit / SDD):** [specs/etapa-1-nucleo-generico-documento/](specs/etapa-1-nucleo-generico-documento/) — generalization of the core (`Documento`, `fuentes`, `installation.yaml`, declared filters).
