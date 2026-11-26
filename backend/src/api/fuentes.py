@@ -1,5 +1,6 @@
 """Ejecución manual de un conector: POST /v1/fuentes/{clave}/ejecutar
-(FR-011), para operabilidad y debugging sin esperar al scheduler."""
+(FR-011), para operabilidad y debugging sin esperar al scheduler. Only the
+operator may call it (`src/auth/operator.py`)."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_embedder, get_installation_config, get_session
+from src.auth.operator import require_operator
 from src.config.installation import InstallationConfig
 from src.connectors.registry import CONECTORES, VERSIONES
 from src.connectors.runner import ejecutar_conector
@@ -23,10 +25,13 @@ class EjecucionSalida(BaseModel):
     descubiertos: int
     nuevos: int
     existentes: int
+    changed: int
     errores: int
 
 
-@router.post("/v1/fuentes/{clave}/ejecutar", response_model=EjecucionSalida)
+@router.post(
+    "/v1/fuentes/{clave}/ejecutar", response_model=EjecucionSalida, dependencies=[Depends(require_operator)]
+)
 def ejecutar_fuente(
     clave: str,
     session: Session = Depends(get_session),
@@ -54,5 +59,6 @@ def ejecutar_fuente(
         descubiertos=ejecucion.descubiertos,
         nuevos=ejecucion.nuevos,
         existentes=ejecucion.existentes,
+        changed=ejecucion.changed,
         errores=ejecucion.errores,
     )

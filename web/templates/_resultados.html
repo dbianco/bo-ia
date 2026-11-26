@@ -3,18 +3,27 @@
   {% for r in resultados %}
   <li class="resultado">
     <p class="resultado-fecha">
-      {{ r.fecha }} — {{ r.identificador_externo }}
+      {{ r.fecha }} —
+      {% if r.notice_number %}Aviso Nº {{ r.notice_number }}{% else %}{{ r.identificador_externo }}{% endif %}
+      {% if r.page %}<span class="resultado-cita">· página {{ r.page }}</span>{% endif %}
+      {% if r.segmented == false %}<span class="badge-texto">sin separar en avisos</span>{% endif %}
       {% if r.coincidencia_texto %}<span class="badge-texto">coincidencia de texto</span>{% endif %}
     </p>
+    {% if r.notice_number and r.titulo %}<p class="resultado-titulo">{{ r.titulo }}</p>{% endif %}
     <p class="resultado-texto">{{ r.texto }}</p>
-    <a href="{{ r.url_fuente }}" target="_blank" rel="noopener">Ver documento oficial</a>
+    {% set url = r.url_fuente | safe_url %}
+    {% if url %}
+    <a href="{{ url }}" target="_blank" rel="noopener noreferrer">
+      Ver documento oficial{% if r.first_page %}, {% if r.first_page == r.last_page %}página {{ r.first_page }}{% else %}páginas {{ r.first_page }} a {{ r.last_page }}{% endif %}{% endif %}
+    </a>
+    {% endif %}
     <div class="resultado-valoracion" id="valoracion-{{ r.fragmento_id }}">
       <button
         type="button"
         class="boton-valoracion"
         aria-label="Marcar este resultado como útil"
         hx-post="/valorar"
-        hx-vals='{"fragmento_id": "{{ r.fragmento_id }}", "consulta": "{{ consulta }}", "valor": "positivo"}'
+        hx-vals='{{ {"fragmento_id": r.fragmento_id, "consulta": consulta, "valor": "positivo"} | tojson }}'
         hx-target="#valoracion-{{ r.fragmento_id }}"
         hx-swap="outerHTML"
       >👍</button>
@@ -23,7 +32,7 @@
         class="boton-valoracion"
         aria-label="Marcar este resultado como no útil"
         hx-post="/valorar"
-        hx-vals='{"fragmento_id": "{{ r.fragmento_id }}", "consulta": "{{ consulta }}", "valor": "negativo"}'
+        hx-vals='{{ {"fragmento_id": r.fragmento_id, "consulta": consulta, "valor": "negativo"} | tojson }}'
         hx-target="#valoracion-{{ r.fragmento_id }}"
         hx-swap="outerHTML"
       >👎</button>

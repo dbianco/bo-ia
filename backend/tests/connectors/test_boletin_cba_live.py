@@ -24,7 +24,11 @@ def test_conector_boletin_cba_contra_el_sitio_real() -> None:
 
     items = list(conector.descubrir(fuente_clave="cba-provincial-licitaciones", config=config))
 
-    assert len(items) == 1
-    documento = items[0]
-    assert isinstance(documento, DocumentoNormalizado)
-    assert documento.texto.strip() != ""
+    assert items
+    for documento in items:
+        assert isinstance(documento, DocumentoNormalizado)
+        assert documento.texto.strip() != ""
+    # Plan 7: section 4 is made of notices, each with its number and page.
+    notices = [i for i in items if i.notice_number]
+    assert notices
+    assert all(n.page_starts for n in notices)

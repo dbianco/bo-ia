@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — {{ config.nombre }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<p role="alert">{{ message }}</p>
+<p><a href="/">Volver a la búsqueda</a></p>
+{% endblock %}

@@ -28,13 +28,14 @@ class _EmbedderQueSiempreFalla:
 
 
 @pytest.fixture()
-def client(db_session: Session):
+def client(db_session: Session, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OPERATOR_TOKEN", "token-de-prueba")
     def _get_session_override():
         yield db_session
 
     app.dependency_overrides[get_session] = _get_session_override
     app.dependency_overrides[get_embedder] = lambda: FakeEmbeddingProvider()
-    yield TestClient(app)
+    yield TestClient(app, headers={"Authorization": "Bearer token-de-prueba"})
     app.dependency_overrides.clear()
 
 

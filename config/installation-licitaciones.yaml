@@ -6,6 +6,8 @@
 # docker-compose.licitaciones.override.yml y .env.licitaciones.example.
 
 nombre: Licitaciones Argentina
+# When a day begins and ends, for the daily and weekly digests.
+timezone: America/Argentina/Buenos_Aires
 # Sin datos de ejemplo del Boletín (son específicos de ese vertical, ver
 # src/seed/seed.py): esta instalación se alimenta solo de sus conectores.
 seed: false

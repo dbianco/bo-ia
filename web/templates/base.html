@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ config.nombre }}{% endblock %}</title>
+  <script src="/static/tema-inicial.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="navegacion" aria-label="Principal">
+    <a href="/">Buscar</a>
+    {% if signed_in %}
+    <a href="/bandeja">Avisos{% if unread %} ({{ unread }}){% endif %}</a>
+    <a href="/suscripciones">Suscripciones</a>
+    <form method="post" action="/salir"><button type="submit" class="enlace">Salir</button></form>
+    {% else %}
+    <a href="/ingresar">Ingresar</a>
+    <a href="/registro">Crear cuenta</a>
+    {% endif %}
+  </nav>
+  <main>
+    <div class="encabezado">
+      <div>
+        <h1>{% block heading %}{{ config.nombre }}{% endblock %}</h1>
+        <p class="subtitulo">{% block subtitle %}{{ config.nombre }}{% endblock %}</p>
+      </div>
+      <button
+        type="button"
+        id="theme-toggle"
+        class="theme-toggle"
+        aria-pressed="false"
+        aria-label="Cambiar a tema claro"
+      >🌙</button>
+    </div>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/theme.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

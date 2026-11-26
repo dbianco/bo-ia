@@ -11,6 +11,9 @@ dependencies = [
     "pgvector>=0.3,<1.0",
     "sentence-transformers>=6.0,<7.0",
     "transformers>=5.10,<6.0",  # >=5.10.0 corrige CVE-2026-9856 y las demás CVEs de PYSEC-2026-* (pip-audit)
+    "numpy>=1.26,<3.0",  # offline embeddings and benchmark; sentence-transformers already brought it in
+    "numba>=0.61,<1.0",  # compiles the inner loops of the vector and lexical indexes; no toolchain needed
+    "tzdata>=2025.1",  # time zones of the digests, if the system has none
     "alembic>=1.14,<2.0",
     "pydantic-settings>=2.6,<3.0",
     "pyyaml>=6.0,<7.0",  # parsea installation.yaml (config de instalación); no hay parser YAML en la librería estándar
@@ -24,6 +27,9 @@ dev = [
     "pytest>=9.0.3,<10.0",  # >=9.0.3 corrige PYSEC-2026-1845 (pip-audit)
     "httpx>=0.27,<1.0",
     "ruff>=0.16,<1.0",
+    # The web has no tests of its own: they are in tests/web, next to the API it calls.
+    "jinja2>=3.1,<4.0",
+    "python-multipart>=0.0.12,<1.0",
 ]
 
 [build-system]

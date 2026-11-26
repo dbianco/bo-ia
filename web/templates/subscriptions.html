@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Suscripciones — {{ config.nombre }}{% endblock %}
+{% block heading %}Suscripciones{% endblock %}
+{% block content %}
+<section aria-labelledby="nueva">
+  <h2 id="nueva">Nueva suscripción</h2>
+  <form method="post" action="/suscripciones" class="formulario">
+    <label for="texto_busqueda">Qué documentos te interesan</label>
+    <textarea id="texto_busqueda" name="texto_busqueda" rows="2" required placeholder="ej: licitaciones de obra vial"></textarea>
+    {% for f in config.filtros %}
+    <label for="nueva-filtro-{{ loop.index }}">{{ f.etiqueta }} (opcional)</label>
+    <input
+      type="text"
+      id="nueva-filtro-{{ loop.index }}"
+      name="filtro.{{ f.clave }}"
+      autocomplete="off"
+      {% if f.tipo == "rango_numerico" %}placeholder="min,max"{% endif %}
+    >
+    {% endfor %}
+    {% with prefix = "nueva", channels = ["bandeja"], frequency = "immediate" %}{% include "_settings.html" %}{% endwith %}
+    <button type="submit" class="boton">Suscribirme</button>
+  </form>
+</section>
+
+<section aria-labelledby="actuales">
+  <h2 id="actuales">Tus suscripciones</h2>
+  {% if not subscriptions %}<p>Todavía no tenés suscripciones.</p>{% endif %}
+  <ul class="resultados-lista">
+    {% for s in subscriptions %}
+    <li class="resultado">
+      <p class="resultado-titulo">
+        {{ s.texto_busqueda }}
+        {% if s.estado == "pausada" %}<span class="badge-texto">pausada</span>{% endif %}
+      </p>
+      {% if s.filtros %}
+      <p class="resultado-fecha">{% for key, f in s.filtros.items() %}{{ key }}: {{ f.valor }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      {% endif %}
+      <details class="ajustes">
+        <summary>Ajustes</summary>
+        <form method="post" action="/suscripciones/{{ s.id }}/ajustes" class="formulario">
+          {% with prefix = "s" ~ s.id, channels = s.canales or ["bandeja"], frequency = s.frecuencia_notificacion %}{% include "_settings.html" %}{% endwith %}
+          <button type="submit" class="boton">Guardar</button>
+        </form>
+      </details>
+      <div class="acciones">
+        {% if s.estado == "activa" %}
+        <form method="post" action="/suscripciones/{{ s.id }}/pausar"><button type="submit" class="enlace">Pausar</button></form>
+        {% else %}
+        <form method="post" action="/suscripciones/{{ s.id }}/reanudar"><button type="submit" class="enlace">Reanudar</button></form>
+        {% endif %}
+        <form method="post" action="/suscripciones/{{ s.id }}/borrar"><button type="submit" class="enlace">Borrar</button></form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

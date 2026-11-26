@@ -5,15 +5,18 @@ renombrar un filtro no debe requerir tocar el motor.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import select
+from pydantic import BaseModel, Field, ValidationError, field_validator
+from sqlalchemy import literal, not_, select, update
+from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import Session
 
-from src.db.models import Fuente
+from src.db.models import Documento, Fuente
 
 
 class InstallationConfigInvalida(ValueError):
@@ -50,6 +53,9 @@ class ConectorConfig(BaseModel):
 class FuenteConfig(BaseModel):
     clave: str
     nombre: str
+    # Values that are the same for every document of the source, such as the
+    # province. They are added to each document, so its filters find it.
+    metadata: dict[str, str | int | float] = Field(default_factory=dict)
     conector: ConectorConfig | None = None
 
 
@@ -62,6 +68,17 @@ class InstallationConfig(BaseModel):
     # vertical no debe recibirlos. Default `True` para no cambiar el
     # comportamiento de la instalación de boletines ya existente.
     seed: bool = True
+    # Of the periods of the digests.
+    timezone: str = "UTC"
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"unknown time zone {value!r}") from exc
+        return value
 
 
 def cargar_installation_config(ruta: str | Path) -> InstallationConfig:
@@ -78,17 +95,51 @@ def cargar_installation_config(ruta: str | Path) -> InstallationConfig:
         raise InstallationConfigInvalida(f"Configuración de instalación inválida ({path}): {exc}") from exc
 
 
+def fill_fixed_metadata(session: Session, fuente: Fuente) -> int:
+    """Adds the fixed metadata of a source to its documents that do not have it.
+    A value that a document has is kept. Returns how many documents changed."""
+    fixed = (fuente.config or {}).get("metadata", {})
+    if not fixed:
+        return 0
+    result = session.execute(
+        update(Documento)
+        .where(Documento.fuente_id == fuente.id, not_(Documento.metadata_.has_all(array(list(fixed)))))
+        .values(metadata_=literal(fixed, type_=JSONB).op("||")(Documento.metadata_))
+        .execution_options(synchronize_session=False)
+    )
+    return result.rowcount
+
+
 def upsert_fuentes(session: Session, config: InstallationConfig) -> int:
     """Crea o actualiza las fuentes declaradas por la instalación,
     idempotente por `clave` (FR-008). Devuelve la cantidad de fuentes
-    nuevas creadas."""
+    nuevas creadas.
+
+    The fixed metadata of a source is also added to the documents it already
+    has, so that the filters find them."""
     creadas = 0
     for declarada in config.fuentes:
         existente = session.scalar(select(Fuente).where(Fuente.clave == declarada.clave))
+        fijos = {"metadata": declarada.metadata} if declarada.metadata else {}
         if existente is None:
-            session.add(Fuente(clave=declarada.clave, nombre=declarada.nombre, config={}))
+            session.add(Fuente(clave=declarada.clave, nombre=declarada.nombre, config=fijos))
             creadas += 1
-        elif existente.nombre != declarada.nombre:
+            continue
+        if existente.nombre != declarada.nombre:
             existente.nombre = declarada.nombre
+        existente.config = {k: v for k, v in (existente.config or {}).items() if k != "metadata"} | fijos
+        fill_fixed_metadata(session, existente)
     session.commit()
     return creadas
+
+
+def unfillable_filters(config: InstallationConfig, connector_keys: Mapping[str, frozenset[str]]) -> list[str]:
+    """Declared filters that no configured source can fill: searching by one of
+    them excludes every document that is collected. `connector_keys` are the
+    metadata keys each type of connector may write."""
+    fillable: set[str] = set()
+    for fuente in config.fuentes:
+        fillable.update(fuente.metadata)
+        if fuente.conector is not None:
+            fillable.update(connector_keys.get(fuente.conector.tipo, frozenset()))
+    return [f.clave for f in config.filtros if f.clave not in fillable]

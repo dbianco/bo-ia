@@ -1,4 +1,4 @@
-# 2. Offline embeddings
+# 2. Offline embeddings - DONE
 
 ## Goal
 
@@ -42,7 +42,32 @@ The provider and its parameters are recorded in every benchmark report, since re
 - On the synthetic corpus, the nearest neighbours of a document are mostly from its own topic, measured as precision against the truth file.
 - Embedding 1,000,000 fragments takes minutes on a laptop CPU.
 
-## Open decisions
+## Status
 
-- Dimension of the offline vectors: keep `EMBEDDING_DIM` so the database schema is unchanged, or allow a smaller one for in-process indexes.
-- How much of the similarity structure comes from the synonym table versus shared words. Too much makes the benchmark circular; this needs a short written justification with the first numbers.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: with the network blocked by the system sandbox and no model on disk, the benchmark ran and its report named `provider=hashed`.
+
+| Criterion | Result | Test |
+|---|---|---|
+| Tests and benchmark with no network and no model | Met. The tests of plans 1 and 2 also pass in a network namespace without interfaces, where the database cannot be reached | `tests/benchmark/test_offline_embeddings.py::test_benchmark_command_runs_offline_and_names_the_provider` |
+| Same text and seed, same vector | Met: sums are done on integers, and a recorded vector is checked. Only one machine was available | `tests/processor/test_hashed_embeddings.py::test_vector_is_the_same_on_every_machine` |
+| Nearest neighbours mostly from the same topic | Met: precision@5 of 0.66 (gazette) and 0.55 (tenders), without counting republished copies | `tests/benchmark/test_offline_embeddings.py::test_nearest_neighbours_are_mostly_from_the_same_topic` |
+| 1,000,000 fragments in minutes | Met: 6.5 minutes, one process | `tests/processor/test_hashed_embeddings.py::test_speed_allows_a_million_fragments_in_minutes` (guard of 20 minutes) |
+
+## Decisions
+
+- **Dimension.** `EMBEDDING_DIM` by default, so the schema does not change. In-process indexes may use a smaller one (`dim`, `--dim`).
+- **Synonyms against shared words.** The provider knows 80% of the phrases of the corpus as synonyms (`--synonym-coverage`), with a weight of 3 for a concept, 1 for a word and 0.5 for a pair of words. They were chosen on seeds 1001 and 1002 with these measurements in mind (seed 42, 2,000 documents, recall@50 of the exact scan and precision@5 of the neighbours):
+
+  | Coverage | Gazette: paraphrase | Gazette: neighbours | Tenders: paraphrase | Tenders: neighbours |
+  |---|---|---|---|---|
+  | 0 (words only) | 0.24 | 0.15 | 0.12 | 0.12 |
+  | 0.4 | 0.47 | 0.44 | 0.32 | 0.32 |
+  | 0.6 | 0.61 | 0.51 | 0.55 | 0.43 |
+  | **0.8** | **0.88** | **0.66** | **0.77** | **0.55** |
+  | 1 | 1.00 | 0.88 | 1.00 | 0.83 |
+
+  With no synonyms the vectors are as blind to paraphrases as lexical search (0.24 and 0.23). With all of them every answer is given away, which is the circular case. At 0.8 search is clearly semantic and still fails on about one paraphrase in five.
+- **What these numbers are not.** The synonyms come from the generator, so they say nothing about how well the real model understands Spanish. They serve to compare implementations of search and matching that receive the same vectors.
+- **The fake provider** stays, only for tests that need arbitrary vectors. Settings cannot select it.
+- **Match threshold.** 0.45 for the hashed provider in the benchmark. It is not comparable with `SIMILARITY_THRESHOLD` for the real model.
+- **Selection.** `EMBEDDING_PROVIDER` (`model` by default, `hashed`, `precomputed`), `EMBEDDING_SEED`, `EMBEDDING_SYNONYMS` and `EMBEDDING_PRECOMPUTED`.

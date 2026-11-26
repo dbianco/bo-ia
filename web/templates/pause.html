@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Pausar suscripción — {{ config.nombre }}{% endblock %}
+{% block heading %}Pausar suscripción{% endblock %}
+{% block content %}
+<p class="resultado-titulo">{{ subscription.texto_busqueda }}</p>
+{% if done %}
+<p role="status">La suscripción quedó pausada. No vas a recibir más avisos de documentos nuevos. Podés reanudarla desde <a href="/suscripciones">tus suscripciones</a>.</p>
+{% elif subscription.estado == "pausada" %}
+<p role="status">Esta suscripción ya está pausada.</p>
+{% else %}
+<form method="post" action="/pausar">
+  <input type="hidden" name="token" value="{{ token }}">
+  <button type="submit" class="boton">Pausar esta suscripción</button>
+</form>
+{% endif %}
+{% endblock %}

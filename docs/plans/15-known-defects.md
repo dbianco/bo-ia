@@ -1,4 +1,4 @@
-# 15. Fix known defects
+# 15. Fix known defects - DONE
 
 ## Goal
 
@@ -97,9 +97,34 @@ A is first because it is the only defect that lets an outsider act on the system
 - A run in which every item fails is `fallida`; a run with some failures is not `completada`.
 - A tender row with an opening date stores it. The same row with a changed date is counted as changed, and the same row reformatted is not.
 
-## Open decisions
+## Status
 
-- One token for both endpoints or one for each.
-- Whether to rate-limit or restrict the other endpoints open to anonymous callers, such as `POST /v1/valoraciones`. They were not reviewed for this plan.
-- The names of the new run state and of the changed count.
-- Whether defect A is released on its own, ahead of the rest.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand, on the running service: both write endpoints answered 401 with no token and with a wrong one, and nothing changed. A source that had never run ran after startup; a restart before it was due did not run it; once overdue it ran after a restart and stored no duplicate. Filtering by `provincia` found the collected gazette documents. The five migrations were also applied, reverted and applied again on a copy of a database created by the previous version, with no row lost and no drift. The opening date (F) was checked with test data only: see Found meanwhile.
+
+| Criterion | Result | Test |
+|---|---|---|
+| Each defect has a test that fails before and passes after | Met | the files below |
+| A. A missing or wrong token, or none configured, is rejected and changes nothing | Met | `tests/api/test_write_token.py` |
+| B. A source runs when it is due, and not before, with a clock under control | Met, for restarts every 1 to 23 hours and intervals of 3 hours to 30 days | `tests/scheduler/test_first_run.py` |
+| C. `provincia` finds new and stored documents, in searches and subscriptions | Met | `tests/config/test_metadata_backfill.py`, `tests/api/test_notices.py` |
+| D. A document that failed once ends complete, with one set of fragments and one match | Met, also with two retries at the same time | `tests/ingestor/test_retry.py` |
+| E. All items failed: `fallida`. Some: not `completada` | Met | `tests/connectors/test_run_states.py` |
+| F, G. The opening date is stored; a changed one is counted and a reformatted row is not | Met | `tests/connectors/test_opening_date.py`, `tests/ingestor/test_changed_records.py` |
+
+## Decisions
+
+- **Token.** One for both endpoints, `OPERATOR_TOKEN`, as `Authorization: Bearer`. It is checked before the source and the body are looked at. With no token configured both are closed, and startup says so.
+- **Other endpoints open to anonymous callers**, reviewed and left as they are, because they are part of the product: `POST /v1/valoraciones` (the web page rates results without an account; nothing reads the ratings yet, but anybody can fill the table), `POST /v1/auth/registro` (anybody can create an account, and so a subscription that sends email to the address they gave, which is not verified) and the search (each call costs an embedding). They have a limit by address since plan 10 (`src/api/rate_limit.py`), set by environment variables. A test lists every route that writes and who may call it, so that a new one is a decision.
+- **Runs.** The new state is `partial`, and the new count is `changed`, a part of the existing ones. A partial run counts as done for the schedule; the failed items are retried when they arrive again. A run that discovers nothing is `completada`.
+- **First runs.** Overdue sources start 5 seconds after startup, the longest overdue first and 30 seconds apart, and two runs at once at most. A job that has to wait starts late: the library's default was to skip it.
+- **Stored documents and fixed metadata.** Added at startup from the configuration, and not by a migration, which does not know the values of each installation.
+- **Retries** process the stored text and date. The pages of the fragments are known only if the text that arrives is the same.
+- **What is a change.** The text, and the metadata keys that were stored. A key that is missing now is a change; a new key is not, and is added. Spacing, key order and the way a number is written do not count.
+- **Releasing A on its own.** Possible: it is `src/auth/operator.py`, two decorators and the configuration. It was done first.
+
+## Found meanwhile
+
+- A document whose process is killed while it is being embedded stays `pendiente`, and is not retried: it cannot be told from one in progress. For plan 13.
+- A run interrupted in the same way stays `en_curso`. It does not count as done, so the source runs again after the restart.
+- Seen on 2026-11-26 and present before these changes: the national tender CSV now separates columns with `;` and has other names (`Fecha de Apertura`, `Descripcion SAF`). `comprar-gob-ar-csv` fails on all of its rows (132,658) and collects nothing. It needs its own fix, including the column of the opening date.
+- The backend does not configure logging, so its `INFO` messages, such as the one that says the search engine is ready, are never shown. Also true before.

@@ -1,6 +1,6 @@
-# Checklist de accesibilidad — página de búsqueda (WCAG 2.1 AA)
+# Checklist de accesibilidad (WCAG 2.1 AA)
 
-T029. Verificación manual sobre `web/templates/search.html` y `_resultados.html`. Se corre con el stack levantado (`docker compose up --build`) contra `http://localhost:9102`.
+T029. Verificación manual sobre `web/templates/search.html` y `_resultados.html`, y sobre las pantallas de cuentas, suscripciones y avisos (`account.html`, `subscriptions.html`, `inbox.html`, `pause.html`). Que cada campo tenga su etiqueta y los `id` no se repitan se verifica además en `backend/tests/web/test_web.py`. Se corre con el stack levantado (`docker compose up --build`) contra `http://localhost:9102`.
 
 ## Navegación por teclado
 

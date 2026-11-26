@@ -1,4 +1,4 @@
-# 1. Synthetic corpus and benchmark harness
+# 1. Synthetic corpus and benchmark harness - DONE
 
 ## Goal
 
@@ -54,8 +54,60 @@ A deterministic generator of gazette and tender documents with planted relevance
 - A lexical-only baseline scores clearly below a perfect oracle on the paraphrase queries, which shows the corpus is not trivially solvable.
 - Generating 1,000,000 fragments takes minutes, not hours, on a laptop CPU.
 
-## Open decisions
+## Status
 
-- How many topics and vocabularies are needed before rankings stop being trivial.
-- Whether the generated text is Spanish only, matching the real sources.
-- Where generated corpora live: generated on demand, never committed.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: with the network blocked and no model, `generate` run twice with seed 42 and 2,000 documents wrote identical files, and `run` wrote identical reports. The search and matching figures are the ones below.
+
+| Criterion | Result | Test |
+|---|---|---|
+| Same seed, same files | Met, also with a different `PYTHONHASHSEED` | `tests/synthetic/test_corpus.py::test_same_seed_writes_identical_files`, `::test_output_does_not_depend_on_the_process_hash_seed` |
+| Metrics against hand-computed values | Met | `tests/benchmark/test_metrics.py` |
+| Lexical baseline below the oracle on paraphrases | Met: recall@50 0.23 against 1.00, ndcg@10 0.05 against 1.00 | `tests/benchmark/test_harness.py::test_lexical_baseline_is_clearly_below_the_oracle_on_paraphrase_queries` |
+| 1,000,000 fragments in minutes | Met: 1.7 minutes | `tests/synthetic/test_corpus.py::test_generation_speed_allows_a_million_fragments_in_minutes` (guard of 20 minutes) |
+
+### First numbers
+
+Gazette profile, seed 42, 2,000 documents, 164 topics, 120 queries, 60 subscriptions. Hashed provider, dimension 1024, synonym coverage 0.8, match threshold 0.45. Four virtual CPUs, Intel Xeon at 2.60 GHz, 15 GB, PostgreSQL 16 with pgvector 0.8.5 on the same machine.
+
+| System | Queries | MRR | nDCG@10 | recall@50 | p50 |
+|---|---|---|---|---|---|
+| oracle | paraphrase | 1.00 | 1.00 | 1.00 | |
+| lexical BM25 | paraphrase | 0.11 | 0.05 | 0.23 | 0.4 ms |
+| lexical BM25 | same vocabulary | 0.82 | 0.62 | 0.57 | |
+| exact vector scan | paraphrase | 0.86 | 0.74 | 0.88 | 2 ms |
+| exact vector scan | same vocabulary | 0.91 | 0.80 | 0.92 | |
+| PostgreSQL, all | paraphrase | 0.86 | 0.74 | 0.88 | 453 ms |
+| PostgreSQL, semantic | paraphrase | 0.80 | 0.63 | 0.60 | 462 ms |
+
+| Matching | Precision | Recall | Documents per second |
+|---|---|---|---|
+| brute force | 0.37 | 0.71 | 1146 |
+| PostgreSQL | 0.37 | 0.71 | 3.4 |
+
+- PostgreSQL in `all` mode finds the same as the exact scan, and its matching agrees with the brute-force one match by match (374 hits, 632 false positives, 156 misses). The adapters and the references confirm each other.
+- `semantic` is below `all` because of the threshold. `hybrid` adds nothing on paraphrases: its full-text half requires every word of the query.
+- Matching takes 0.28 s per document with 60 subscriptions, so the current design is what plan 3 says it is. A PostgreSQL search takes 0.45 s with 2,000 documents when asked for 50 of them.
+- Matching precision is low because documents on the same kind and subject with another aspect count as wrong.
+
+### Scale run
+
+868,000 documents, 1,000,536 fragments, 3,180 topics, same seed and provider. Generation took 1.7 minutes and embedding 6.5, and the whole command 16 minutes with a peak of about 6.6 GB. Other tests were running on the machine at the same time.
+
+| System | Queries | MRR | nDCG@10 | precision@10 | p50 |
+|---|---|---|---|---|---|
+| oracle | paraphrase | 1.00 | 1.00 | 1.00 | |
+| lexical BM25 | paraphrase | 0.00 | 0.00 | 0.00 | 17 ms |
+| lexical BM25 | same vocabulary | 0.99 | 0.93 | 0.88 | |
+| exact vector scan | paraphrase | 0.56 | 0.51 | 0.49 | 498 ms |
+| exact vector scan | same vocabulary | 0.95 | 0.85 | 0.79 | |
+
+A topic has some 270 documents at this size, so recall@50 cannot pass 0.34 even for the oracle: precision and nDCG are the figures to read. PostgreSQL was not measured at this size, as loading it through the ingestion path would take days with subscriptions.
+
+## Decisions
+
+- **Topics and vocabularies.** 101 concepts with three vocabularies each give 3,180 topics, in five families. A corpus uses about 12 documents per topic until all pairs of kind and subject are in use, and then more aspects. Rankings are not trivial at any size measured: the exact vector scan has nDCG@10 of 0.75 on paraphrases with 400 documents and 0.50 with 8,000; lexical search has 0.18 and 0.00.
+- **Language.** Spanish only, like the sources.
+- **Where corpora live.** Generated on demand. `benchmark-output/` is ignored by git.
+- **Held-out vocabulary.** For each kind and subject, one vocabulary is never used to name them in its documents, and is the only one its paraphrase queries use. The aspect is not held out, which leaves lexical search a weak signal.
+- **Grades.** 2 for the exact topic, 1 for the same kind and subject with another aspect. Precision, recall and MRR count only grade 2.
+- **Truth filters** are evaluated by code of their own, so the filters of the engine are not checked against themselves.

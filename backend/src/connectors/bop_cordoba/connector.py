@@ -21,6 +21,7 @@ from src.connectors.protocol import ErrorDescubrimiento
 from src.ingestor.contract import DocumentoNormalizado
 
 VERSION = "bop-cordoba-scrapy-v1"
+METADATA_KEYS = frozenset({"organismo"})
 
 TIMEOUT_DESCARGA_DEFAULT = 30
 REINTENTOS_DEFAULT = 2

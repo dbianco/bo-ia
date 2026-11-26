@@ -14,6 +14,7 @@ import datetime
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
     Computed,
     DateTime,
@@ -22,19 +23,32 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    case,
     func,
+    select,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, column_property, mapped_column, relationship
 
 EMBEDDING_DIM = 1024  # dimensión de salida de Qwen/Qwen3-Embedding-0.6B
 
 ORIGENES_TAG = ("manual", "modelo", "sugerido")
 VALORES_FEEDBACK = ("positivo", "negativo")
 
+# States of a document besides "pendiente", "completo" and "error".
+NOT_SEARCHABLE = "not_searchable"  # kept for completeness, without fragments (the cover of an issue)
+SUPERSEDED = "superseded"  # replaced by the notices it contained; kept for its history
+
 
 class Base(DeclarativeBase):
     pass
+
+
+# The transaction that last changed a row. An index in memory asks for the rows
+# of the transactions that had not finished when it last looked, so it does not
+# miss a change that commits late. Kept up to date by a trigger.
+CURRENT_TRANSACTION = text("pg_current_xact_id()::text::bigint")
 
 
 class Fuente(Base):
@@ -56,7 +70,9 @@ class Fuente(Base):
     ejecuciones: Mapped[list[EjecucionFuente]] = relationship(back_populates="fuente")
 
 
-ESTADOS_EJECUCION = ("en_curso", "completada", "fallida")
+# "partial": some items failed and others did not.
+ESTADOS_EJECUCION = ("en_curso", "completada", "partial", "fallida")
+SUCCESSFUL_RUNS = ("completada", "partial")
 
 
 class EjecucionFuente(Base):
@@ -74,6 +90,8 @@ class EjecucionFuente(Base):
     descubiertos: Mapped[int] = mapped_column(nullable=False, server_default="0")
     nuevos: Mapped[int] = mapped_column(nullable=False, server_default="0")
     existentes: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    # Of the ones that were already there, how many came with other content.
+    changed: Mapped[int] = mapped_column(nullable=False, server_default="0")
     errores: Mapped[int] = mapped_column(nullable=False, server_default="0")
     version_conector: Mapped[str] = mapped_column(String(64), nullable=False)
     # Lista de {"identificador_externo": str | None, "error": str}, una por
@@ -108,6 +126,16 @@ class Documento(Base):
     # declarados por instalación (`aplicar_filtros`) usen el operador `@>`.
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, server_default="{}")
     version_ingesta: Mapped[str] = mapped_column(String(32), nullable=False, server_default="v1")
+    # Also moves when one of its fragments changes.
+    changed_xid: Mapped[int] = mapped_column(BigInteger, server_default=CURRENT_TRANSACTION, nullable=False)
+    # Where to find the document in the publication it came in. `issue` is
+    # shared by everything printed in one issue (one PDF, for instance); the
+    # number is the official one within it. A document with an issue and no
+    # number is text that could not be attributed to any notice.
+    issue: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    notice_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    first_page: Mapped[int | None] = mapped_column(nullable=True)
+    last_page: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -119,7 +147,11 @@ class Documento(Base):
 
     __table_args__ = (
         UniqueConstraint("fuente_id", "identificador_externo", name="uq_documento_fuente_identificador"),
-        UniqueConstraint("hash_contenido", name="uq_documento_hash_contenido"),
+        # With the date: the same notice is published on consecutive days with
+        # identical text, and each publication is a document.
+        UniqueConstraint("hash_contenido", "fecha", name="uq_documento_hash_contenido_fecha"),
+        Index("ix_documentos_fuente_id_issue", "fuente_id", "issue"),
+        Index("ix_documentos_changed_xid", "changed_xid"),
         Index("ix_documentos_metadata_gin", "metadata", postgresql_using="gin"),
     )
 
@@ -137,6 +169,7 @@ class Fragmento(Base):
     # filtro de fecha de la búsqueda la necesita sin tener que hacer join
     # contra documentos en cada búsqueda.
     fecha: Mapped[datetime.date] = mapped_column(nullable=False)
+    page: Mapped[int | None] = mapped_column(nullable=True)  # where the fragment starts
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     # Búsqueda de texto completo en español (modos HYBRID/ALL). Columna
@@ -259,6 +292,7 @@ class Sesion(Base):
 
 
 ESTADOS_SUSCRIPCION = ("activa", "pausada")
+FREQUENCIES = ("immediate", "daily", "weekly")
 
 
 class Suscripcion(Base):
@@ -280,10 +314,17 @@ class Suscripcion(Base):
     filtros: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     estado: Mapped[str] = mapped_column(String(16), nullable=False, server_default="activa")
     canales: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
-    frecuencia_notificacion: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    ultima_evaluacion: Mapped[datetime.datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    # Of the emails; the inbox never waits.
+    frecuencia_notificacion: Mapped[str] = mapped_column(String(32), nullable=False, server_default="immediate")
+    # Last evaluation before it was paused. Read `ultima_evaluacion`, below,
+    # which also knows about an active subscription without writing to its row.
+    ultima_evaluacion_guardada: Mapped[datetime.datetime | None] = mapped_column(
+        "ultima_evaluacion", DateTime(timezone=True), nullable=True
     )
+    active_since: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp(), nullable=False
+    )
+    changed_xid: Mapped[int] = mapped_column(BigInteger, server_default=CURRENT_TRANSACTION, nullable=False)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -295,7 +336,55 @@ class Suscripcion(Base):
 
     __table_args__ = (
         CheckConstraint(f"estado IN {ESTADOS_SUSCRIPCION}", name="ck_suscripcion_estado"),
+        CheckConstraint(f"frecuencia_notificacion IN {FREQUENCIES}", name="ck_suscripcion_frecuencia"),
+        Index("ix_suscripciones_changed_xid", "changed_xid"),
     )
+
+
+class MatchingState(Base):
+    """One row: when a document was last matched. Matching considers every
+    active subscription, so this is when all of them were last evaluated."""
+
+    __tablename__ = "matching_state"
+
+    id: Mapped[int] = mapped_column(primary_key=True, server_default="1")
+    last_run_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (CheckConstraint("id = 1", name="ck_matching_state_one_row"),)
+
+
+_last_run_at = select(MatchingState.last_run_at).scalar_subquery()
+Suscripcion.ultima_evaluacion = column_property(
+    case(
+        (
+            (Suscripcion.estado == "activa") & (_last_run_at >= Suscripcion.active_since),
+            _last_run_at,
+        ),
+        else_=Suscripcion.ultima_evaluacion_guardada,
+    )
+)
+
+
+class MatchingQueue(Base):
+    """Documents waiting to be matched. The row is written in the transaction
+    that completes the document, so a crash loses none."""
+
+    __tablename__ = "matching_queue"
+
+    documento_id: Mapped[int] = mapped_column(
+        ForeignKey("documentos.id", ondelete="CASCADE"), primary_key=True
+    )
+    enqueued_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # Also the lease: a worker that takes a document moves it to the future.
+    next_attempt_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_matching_queue_next_attempt_at", "next_attempt_at"),)
 
 
 class EvaluacionMatch(Base):
@@ -311,11 +400,16 @@ class EvaluacionMatch(Base):
     suscripcion_id: Mapped[int] = mapped_column(
         ForeignKey("suscripciones.id", ondelete="CASCADE"), nullable=False
     )
+    # The fragment with that score. None in matches from before it was recorded.
+    fragmento_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fragmentos.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     score: Mapped[float] = mapped_column(nullable=False)
     filtros_aplicados: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     fecha_evaluacion: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     documento: Mapped[Documento] = relationship()
+    fragmento: Mapped[Fragmento | None] = relationship()
     suscripcion: Mapped[Suscripcion] = relationship(back_populates="matches")
     entregas: Mapped[list[EntregaNotificacion]] = relationship(
         back_populates="match", cascade="all, delete-orphan"
@@ -335,9 +429,8 @@ CANALES_NOTIFICACION = ("bandeja", "correo")
 class EntregaNotificacion(Base):
     """Un intento de notificar un match por un canal (sección 4.6 del
     design spec, Etapa 4): a lo sumo una entrega por par (match, canal).
-    `reintentos` queda en el modelo para un reintento manual futuro; en
-    esta etapa nada lo incrementa todavía (no hay reintento automático,
-    ver `spec.md`)."""
+    Written with the match. An email waits as `pendiente` until the outbox
+    sends it, on its own or as part of a digest."""
 
     __tablename__ = "entregas_notificacion"
 
@@ -350,6 +443,16 @@ class EntregaNotificacion(Base):
     fecha_intento: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reintentos: Mapped[int] = mapped_column(nullable=False, server_default="0")
     error_proveedor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Of the subscription when it matched.
+    frequency: Mapped[str] = mapped_column(String(16), nullable=False, server_default="immediate")
+    digest_id: Mapped[int | None] = mapped_column(
+        ForeignKey("digests.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Also the lease: a worker that takes a row moves it to the future.
+    next_attempt_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    read_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -359,5 +462,40 @@ class EntregaNotificacion(Base):
     __table_args__ = (
         CheckConstraint(f"canal IN {CANALES_NOTIFICACION}", name="ck_entrega_notificacion_canal"),
         CheckConstraint(f"estado IN {ESTADOS_ENTREGA}", name="ck_entrega_notificacion_estado"),
+        CheckConstraint(f"frequency IN {FREQUENCIES}", name="ck_entrega_notificacion_frequency"),
         UniqueConstraint("match_id", "canal", name="uq_entrega_notificacion_match_canal"),
+        Index(
+            "ix_entregas_notificacion_pendientes",
+            "next_attempt_at",
+            postgresql_where=text("estado = 'pendiente'"),
+        ),
+    )
+
+
+class Digest(Base):
+    """One email with the matches of a user in a period. Which ones they are is in
+    `entregas_notificacion.digest_id`."""
+
+    __tablename__ = "digests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(16), nullable=False)
+    period_end: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    estado: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pendiente")
+    fecha_intento: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reintentos: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    error_proveedor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_attempt_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(f"estado IN {ESTADOS_ENTREGA}", name="ck_digest_estado"),
+        CheckConstraint("frequency IN ('daily', 'weekly')", name="ck_digest_frequency"),
+        # Running it twice does not make it twice.
+        UniqueConstraint("usuario_id", "frequency", "period_end", name="uq_digest_usuario_frequency_period"),
     )

@@ -1,0 +1,16 @@
+{# The channels and the frequency. `prefix` makes the ids unique in the page. #}
+<fieldset>
+  <legend>Avisarme por</legend>
+  {% for value, label in (("bandeja", "Bandeja de avisos"), ("correo", "Correo electrónico")) %}
+  <label class="opcion" for="{{ prefix }}-{{ value }}">
+    <input type="checkbox" id="{{ prefix }}-{{ value }}" name="canal" value="{{ value }}" {% if value in channels %}checked{% endif %}>
+    {{ label }}
+  </label>
+  {% endfor %}
+</fieldset>
+<label for="{{ prefix }}-frecuencia">Frecuencia de los correos</label>
+<select id="{{ prefix }}-frecuencia" name="frecuencia_notificacion">
+  {% for value, label in (("immediate", "Uno por documento, al momento"), ("daily", "Un resumen por día"), ("weekly", "Un resumen por semana")) %}
+  <option value="{{ value }}" {% if value == frequency %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+</select>

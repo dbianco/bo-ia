@@ -41,7 +41,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Lint (ruff)
-        run: ruff check src tests
+        run: ruff check src tests ../web
 
       - name: Tests (incluye la verificación real del modelo de embeddings)
         run: pytest -m "not docker and not live" -v

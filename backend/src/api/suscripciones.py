@@ -4,6 +4,8 @@ FR-011). Pausar/reanudar/borrar una suscripción ajena devuelve 404 (no
 `plan.md`)."""
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -22,6 +24,14 @@ class SuscripcionEntrada(BaseModel):
     texto_busqueda: str = Field(min_length=1)
     filtros: dict[str, str] = Field(default_factory=dict)
     canales: list[str] = Field(default_factory=list)
+    frecuencia_notificacion: Literal["immediate", "daily", "weekly"] = "immediate"
+
+
+class SuscripcionCambio(BaseModel):
+    """What is not said stays as it is."""
+
+    canales: list[str] | None = Field(None, min_length=1)
+    frecuencia_notificacion: Literal["immediate", "daily", "weekly"] | None = None
 
 
 class SuscripcionSalida(BaseModel):
@@ -30,6 +40,7 @@ class SuscripcionSalida(BaseModel):
     filtros: dict
     estado: str
     canales: list[str]
+    frecuencia_notificacion: str
 
 
 def _salida(suscripcion: Suscripcion) -> SuscripcionSalida:
@@ -39,7 +50,14 @@ def _salida(suscripcion: Suscripcion) -> SuscripcionSalida:
         filtros=suscripcion.filtros,
         estado=suscripcion.estado,
         canales=suscripcion.canales,
+        frecuencia_notificacion=suscripcion.frecuencia_notificacion,
     )
+
+
+def _validar_canales(canales: list[str]) -> None:
+    invalidos = set(canales) - set(CANALES_NOTIFICACION)
+    if invalidos:
+        raise HTTPException(status_code=422, detail=f"Canal no soportado: {', '.join(sorted(invalidos))}")
 
 
 def _obtener_propia(session: Session, usuario: Usuario, suscripcion_id: int) -> Suscripcion:
@@ -64,11 +82,7 @@ def crear_suscripcion(
     except ValorDeFiltroInvalido as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    canales_invalidos = set(entrada.canales) - set(CANALES_NOTIFICACION)
-    if canales_invalidos:
-        raise HTTPException(
-            status_code=422, detail=f"Canal no soportado: {', '.join(sorted(canales_invalidos))}"
-        )
+    _validar_canales(entrada.canales)
 
     suscripcion = Suscripcion(
         usuario_id=usuario.id,
@@ -77,6 +91,7 @@ def crear_suscripcion(
         filtros=filtros_snapshot,
         estado="activa",
         canales=entrada.canales,
+        frecuencia_notificacion=entrada.frecuencia_notificacion,
     )
     session.add(suscripcion)
     session.flush()
@@ -91,6 +106,23 @@ def listar_suscripciones(
         select(Suscripcion).where(Suscripcion.usuario_id == usuario.id).order_by(Suscripcion.id)
     ).all()
     return [_salida(s) for s in suscripciones]
+
+
+@router.patch("/v1/suscripciones/{suscripcion_id}", response_model=SuscripcionSalida)
+def cambiar_suscripcion(
+    suscripcion_id: int,
+    cambio: SuscripcionCambio,
+    usuario: Usuario = Depends(get_usuario_actual),
+    session: Session = Depends(get_session),
+) -> SuscripcionSalida:
+    suscripcion = _obtener_propia(session, usuario, suscripcion_id)
+    if cambio.canales is not None:
+        _validar_canales(cambio.canales)
+        suscripcion.canales = cambio.canales
+    if cambio.frecuencia_notificacion is not None:
+        suscripcion.frecuencia_notificacion = cambio.frecuencia_notificacion
+    session.flush()
+    return _salida(suscripcion)
 
 
 @router.post("/v1/suscripciones/{suscripcion_id}/pausar", response_model=SuscripcionSalida)

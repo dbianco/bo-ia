@@ -1,4 +1,4 @@
-# 10. Explained alerts, digests and reliable delivery
+# 10. Explained alerts, digests and reliable delivery - DONE
 
 ## Goal
 
@@ -73,9 +73,34 @@ Tested against a local fake SMTP server, with a controllable clock:
 - Every alert for a text subscription carries an excerpt that is part of the matched document.
 - Text containing HTML appears as text in the email and in the web pages.
 
-## Open decisions
+## Status
 
-- Whether the worker is a thread in the backend, like the scheduler, or a separate process.
-- Channels besides email and inbox, such as a webhook or Telegram.
-- Whether a digest orders matches by score or by date.
-- Whether the web screens are better as a plan of their own.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand, on the running service with a test mail server: with the server stopped ingestion took 0.9 s and the email stayed pending; it arrived with its excerpt once the server was back (the wait until the next attempt was skipped by editing the row). A digest arrived once, also after building and sending again; the end of its period was simulated by dating the delivery two days back. Opening the pause link did not pause, sending its form without signing in did, a forged token got 404 and a form from another site 403.
+
+| Criterion | Result | Test |
+|---|---|---|
+| With the mail server down ingestion takes the same, nothing is lost, and then all are sent | Met | `tests/notifications/test_outbox.py::test_ingestion_takes_the_same_with_the_mail_server_down`, `::test_with_the_server_down_nothing_is_lost_and_then_all_are_sent` |
+| With workers killed, at least once, and duplicates only in the window | Met: killed after claiming, before sending, after the server accepted and after recording; only the third sends twice, with the same Message-ID | `::test_a_worker_that_dies_loses_nothing`, `::test_random_deaths_send_everything_at_least_once`, `::test_many_workers_at_once_send_each_email_once` |
+| Each match in exactly one digest | Met, over random sequences of matches, digests and failures | `tests/notifications/test_digests.py::test_each_match_is_in_exactly_one_digest`, `::test_a_match_that_arrives_while_the_digest_is_built`, `::test_two_workers_build_one_digest` |
+| Every alert has an excerpt that is part of the document | Met | `tests/notifications/test_email_content.py::test_every_alert_carries_an_excerpt_that_is_part_of_the_document`, `tests/api/test_inbox.py` |
+| HTML appears as text in the email and the web | Met | `test_email_content.py::test_text_with_html_appears_as_text`, `::test_the_excerpt_is_escaped_wherever_the_shared_words_are`, and the same in `tests/web/test_web.py` |
+
+## Decisions
+
+- **Worker.** A thread of the backend, like the scheduler and the matching. Rows are claimed with a lease and `SKIP LOCKED`, so several may run.
+- **The window for a duplicate** is from the answer of the mail server to one commit.
+- **Channels.** Only the inbox and email. Others can be added as a value of `canal` with its own way to send.
+- **Order in a digest.** By score, and then by date. All the matches are in it; the first 20 of each subscription with an excerpt.
+- **Digests.** At `DIGEST_HOUR`, local time of the installation; the weekly ones on Mondays. After days without running there is one with everything. The frequency is the one of the subscription when it matched: changing it does not move what is waiting. Pausing does not take back what was found before.
+- **Retries.** From one minute, doubled, up to an hour, `EMAIL_MAX_RETRIES` times. Permanent: a rejected address or content. A refused sender, password or connection is of the server: it is tried again, and the others are not tried until then. With no `SMTP_HOST`, an email fails at once.
+- **Pause link.** It asks before pausing, because mail scanners open links. Signed for that action and subscription, for a year. Without `LINK_SECRET` and `PUBLIC_WEB_URL`, emails have no link, and startup says so.
+- **Highlighting** uses the analyzer of plan 4, so "licitaciones" marks "licitación".
+- **Web screens.** In this plan: sign-in, accounts, subscriptions and the inbox, without scripts. Forms sent by other sites are refused.
+- **Old pending emails.** The migration marks them as failed: they would have been sent now, perhaps months later.
+
+## Found meanwhile
+
+- "obra" and "obras" did not become one term in the analyzer of plan 4, and so in the full-text part of the engine. Fixed; the figures of plan 4 are from before.
+- A line break in the text of a subscription made its emails fail. Fixed.
+- SMTP with STARTTLS does not verify the certificate of the server, as before this plan.
+- An address is not verified when an account is created, so alerts can be sent to somebody else's. The limit on new accounts and the pause link reduce it; verifying the address would close it.

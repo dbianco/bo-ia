@@ -30,26 +30,27 @@ def _condicion_seleccion(filtro: FiltroSeleccion, valor: str):
     return Documento.metadata_.op("@>")(literal({filtro.clave: valor}, type_=JSONB))
 
 
-def _condiciones_rango(filtro: FiltroRangoNumerico, valor: str) -> list:
+def limites_de_rango(filtro: FiltroRangoNumerico, valor: str) -> tuple[float | None, float | None]:
     """`valor` tiene forma "min,max"; cualquiera de los dos lados puede
     quedar vacío (p. ej. "100000," o ",500000")."""
     minimo_str, _, maximo_str = valor.partition(",")
+    limites: list[float | None] = []
+    for nombre, texto in (("mínimo", minimo_str), ("máximo", maximo_str)):
+        try:
+            limites.append(float(texto) if texto else None)
+        except ValueError as exc:
+            raise ValorDeFiltroInvalido(f"Valor {nombre} inválido para '{filtro.clave}': {texto!r}") from exc
+    return limites[0], limites[1]
+
+
+def _condiciones_rango(filtro: FiltroRangoNumerico, valor: str) -> list:
+    minimo, maximo = limites_de_rango(filtro, valor)
     columna = cast(Documento.metadata_[filtro.clave].astext, Numeric)
     condiciones = []
-    if minimo_str:
-        try:
-            condiciones.append(columna >= float(minimo_str))
-        except ValueError as exc:
-            raise ValorDeFiltroInvalido(
-                f"Valor mínimo inválido para '{filtro.clave}': {minimo_str!r}"
-            ) from exc
-    if maximo_str:
-        try:
-            condiciones.append(columna <= float(maximo_str))
-        except ValueError as exc:
-            raise ValorDeFiltroInvalido(
-                f"Valor máximo inválido para '{filtro.clave}': {maximo_str!r}"
-            ) from exc
+    if minimo is not None:
+        condiciones.append(columna >= minimo)
+    if maximo is not None:
+        condiciones.append(columna <= maximo)
     return condiciones
 
 

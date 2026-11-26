@@ -1,4 +1,4 @@
-# 3. Subscription matching engine
+# 3. Subscription matching engine - DONE
 
 ## Goal
 
@@ -60,9 +60,40 @@ Measured on the synthetic corpus from plan 1, against the brute-force reference:
 - Property tests: for random small sets of subscriptions and documents, the indexed engine and the reference return the same matches.
 - After any sequence of add, pause, resume and delete, results equal those of an index rebuilt from scratch.
 
-## Open decisions
+## Status
 
-- Whether the threshold stays global or becomes a property of each subscription. Per-subscription thresholds make the search harder and the product better.
-- How to keep `ultima_evaluacion` meaningful when most subscriptions are never visited for a given document.
-- Whether the index lives in the backend process or in a separate worker.
-- Persistence and recovery of the index: see plan 5.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand, on the running service: one alert for the matching document, none for the other one, and none while the subscription was paused. `scale-matching --database-url` with seed 42, 1,000,000 subscriptions and the hashed provider: recall 0.9934, precision 1.0, no difference between the scan and the loop; indexed 11.8 ms p50 and 18.2 ms p95; 29,034 times the loop with a query per subscription (extrapolated from 2,000).
+
+| Criterion | Result | Test |
+|---|---|---|
+| Recall of at least 0.99 | Met: 0.9934 at 1,000,000 subscriptions | `tests/benchmark/test_scale_matching.py::test_the_engine_meets_the_criteria_against_brute_force`, `tests/matching/test_subscription_index.py::test_recall_and_precision_with_a_graph_and_long_documents` |
+| Precision of 1.0 | Met | the same tests, `tests/matching/test_queue.py::test_a_reported_match_is_checked_against_the_filter` |
+| 1,000,000 subscriptions, documents of 20 fragments | Measured at that scale | `python -m src.benchmark scale-matching` |
+| At least 100 times the reference | Met: 34,600 times the loop the service used, with one query per subscription (extrapolated from 2,000 subscriptions). The owner confirmed that this is the reference that was meant. For information, 67 times a loop in memory, which did not exist | `scale-matching --database-url` |
+| Random sets give the same matches as the reference | Met, exactly, with and without graph | `tests/matching/test_subscription_index.py::test_random_subscriptions_and_documents_match_as_in_the_reference`, `tests/matching/test_matchers.py::test_random_histories_give_the_same_matches` |
+| Any sequence of changes equals an index built from scratch | Met on sets of up to 80 subscriptions, where the search visits everything. On a large graph both are approximate and need not miss the same ones | `tests/matching/test_subscription_index.py::test_any_sequence_of_changes_equals_an_index_built_from_scratch` |
+
+### Numbers
+
+Gazette profile, seed 42, 1,000,000 subscriptions drawn from 3,180 topics, 60% with filters; 30 documents of 20 fragments on different topics, with 6,800 matches each on average. Hashed provider, dimension 1024, synonym coverage 0.8, threshold 0.45. Four virtual CPUs, Intel Xeon (Ice Lake) at 2.60 GHz, 15 GB, PostgreSQL 16 with pgvector 0.8.5 on the same machine.
+
+| | p50 per document | p95 |
+|---|---|---|
+| Indexed engine | 75 ms | 106 ms |
+| Exact scan of the subscriptions that pass the filters, in memory | 559 ms | 740 ms |
+| Loop in memory, one subscription after another | 5.1 s | 5.3 s |
+| Loop with a query per subscription (extrapolated) | 2,636 s | |
+
+Building the index takes 9 minutes. Recall is against the exact scan, which agrees with the loop in memory on the documents on which both ran.
+
+## Decisions
+
+- **Threshold.** Still global. The engine takes it with each document, so a threshold per subscription needs no new index; it comes with the strictness levels of plan 12, which is what makes it useful.
+- **`ultima_evaluacion`.** A document is matched against every active subscription, so one row (`matching_state`) has the time of the last one. For an active subscription the attribute is computed from it and from when it became active; pausing freezes it (a trigger). No subscription row is written.
+- **Where it lives.** In the backend process. The queue is in PostgreSQL, so a separate worker is possible later.
+- **Persistence.** None: the index is built from PostgreSQL with the first document after a start. Plan 5.
+- **Keeping it current.** Each change to a subscription records its transaction (a trigger), and the index asks for the ones that had not finished when it last looked. A change that commits late is not missed, whoever makes it. Deletions are noticed when a match is recorded: the rows decide, not the index.
+- **Few subscriptions.** Under 20,000 there is no graph: every subscription that passes the filters is compared, and results are exact. The same when the filters leave few.
+- **Finding separate regions.** A plain graph search found only 0.73 to 0.92 of the matches at 200,000 subscriptions: the ones above the threshold are in several groups far from each other. The search first explores the layer above, which has one row in 16, and enters the lowest layer from everything near the threshold there.
+- **Queue.** `matching_queue`, written in the transaction that completes the document. A worker takes a document with a lease of 5 minutes, retries failures with increasing waits of up to an hour, and processing a document twice adds nothing. Ingestion no longer sends email. Sending with retries is plan 10.
+- **Downgrading** the migration drops the queue: let it drain first.

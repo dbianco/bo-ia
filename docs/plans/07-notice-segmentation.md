@@ -74,9 +74,36 @@ Measured on generated issues with known notice boundaries, laid out like the rea
 - A test searches with each declared filter and finds connector documents.
 - On the real fixture PDF, the number of notices equals a count made and written down by a person.
 
-## Open decisions
+## Status
 
-- Whether the generator from plan 1 produces PDF files or paged text. Paged text tests the splitter; PDF files also test extraction.
-- Whether an issue is a database table or only metadata shared by its notices.
-- How the content-hash rule changes so that identical notices published on different days are all kept.
-- Whether short notices should be one fragment each, with fragmenting applied only to long ones.
+Implemented. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: the connector ingested the real issue of the fixture into 35 notices and one cover. A second count on the rendered pages gave the same 35 (2, 5, 6, 5, 6, 3, 5 and 3 by page) and the same 6 image notices; the notices opened were on the stated pages; filtering by `provincia` returned them. The real site answered 403 to every weekday tried, from this version and from the previous one, so the issue was read from the fixture.
+
+**Not marked as done:** a person has to confirm the count of 35. Sections 1, 2, 3 and 5 of the real gazette have not been seen.
+
+| Criterion | Result | Test |
+|---|---|---|
+| Boundary precision and recall of at least 0.99 | Met: 0.9997 and 0.9998 at worst over 17,053 notices in 400 generated issues, with no quoted closing lines and with one in every notice | `tests/connectors/test_boletin_cba_segmenter.py::test_boundary_precision_and_recall_on_generated_issues` (150 issues) |
+| No text lost | Met, on the generated issues and on the fixture | same test, `::test_real_pdf_loses_no_text` and `tests/connectors/test_boletin_cba.py::test_no_text_of_the_issue_is_lost_between_extraction_and_documents` |
+| Every result has a number and a page | Met for segmented issues. Text without a closing line is returned with its page, no number and `segmented: false` | `tests/api/test_notices.py::test_every_result_of_a_segmented_source_has_a_number_and_a_page`, `::test_an_unsegmented_document_says_so_and_has_a_page` |
+| Each declared filter finds connector documents | Met | `tests/api/test_notices.py::test_provincia_filter_...`, `::test_municipio_filter_...`, `::test_organismo_and_monto_filters_...` |
+| Fixture: notices equal the count | 35 found, 35 counted: 2, 5, 6, 5, 6, 3, 5 and 3 ending on pages 1 to 8 | `tests/connectors/test_boletin_cba_segmenter.py::test_real_pdf_has_the_number_of_notices_counted_by_eye` |
+
+The generator of issues shares no code with the splitter, but the same author wrote both. The fixture is the only real issue it was checked with.
+
+## Findings
+
+- 6 of the 35 notices of the fixture are images. Their text cannot be extracted: they are stored with their closing line only, and can be found by number but not by content. Reading them needs OCR, which no plan covers.
+- The table of contents is extracted in the middle of a notice that continues on page 2. It is taken out, and the notice is made of two pieces of the text.
+- A closing line gives the last publication date. A whole line with an earlier date than the issue is taken as a quotation.
+
+## Decisions
+
+- **PDF or paged text.** Both. Paged text measures the splitter at scale, and a small PDF writer (`src/synthetic/pdf.py`) tests extraction end to end.
+- **Issue.** Not a table: `documentos.issue`, shared by its notices, with an index. `GET /v1/issues/{source}/{issue}` lists them.
+- **Content hash.** Unique together with the date. Identical text on another day is another document; on the same day it is still a duplicate. This applies to every source: two tenders with the same text and different dates, of which the second was dropped, are now both stored. Downgrading gives the later copies a derived hash, so that no row is deleted.
+- **Short notices.** Nothing special: a notice of up to 1,000 characters is already one fragment, and no fragment crosses a notice.
+- **Cover and contents.** One document per issue, kept but not searchable (`not_searchable`), so that it does not match "licitaciones" every day.
+- **Headers.** A line is removed if it repeats at the edge of at least 3 pages and 60% of them, and appears nowhere inside a page. In an issue of three pages or fewer the headers stay in the text: two pages are not proof, and removing body text is worse.
+- **Page numbers** recorded are those of the PDF, which is what `#page=` opens.
+- **`municipio`** is read from the title of municipal notices ("MUNICIPALIDAD DE ..."). The rule has not been checked with a real section 5. `organismo` and `monto` are not read from gazette notices, so filtering the tender installation by them excludes those: that is plan 8.
+- **Re-segmented sections** are kept as `superseded`, because matches, deliveries and ratings refer to them, and raise no alerts.
