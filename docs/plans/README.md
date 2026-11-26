@@ -9,10 +9,10 @@ Each plan states the goal, what the code does today, the design, milestones, and
 | 1 | [Synthetic corpus and benchmark harness - DONE](01-synthetic-corpus-and-benchmark.md) | Foundation | — |
 | 2 | [Offline embeddings - DONE](02-offline-embeddings.md) | Foundation | — |
 | 3 | [Subscription matching engine - DONE](03-subscription-matching-engine.md) | Core system | 1, 2 |
-| 4 | [Hybrid ranking engine](04-hybrid-ranking-engine.md) | Core system | 1, 2 |
+| 4 | [Hybrid ranking engine - DONE](04-hybrid-ranking-engine.md) | Core system | 1, 2 |
 | 5 | [Incremental, crash-safe index](05-incremental-crash-safe-index.md) | Extension | 3 or 4 |
 | 6 | [Near-duplicate collapsing](06-near-duplicate-collapsing.md) | Extension | 1 |
-| 7 | [Notice segmentation and citable results](07-notice-segmentation.md) | Foundation | 1 |
+| 7 | [Notice segmentation and citable results - DONE](07-notice-segmentation.md) | Foundation | 1 |
 | 8 | [Notice classification and field extraction](08-classification-and-field-extraction.md) | Product | 1, 7 |
 | 9 | [Entity watchlists](09-entity-watchlists.md) | Product | 1, 7 |
 | 10 | [Explained alerts, digests and reliable delivery - DONE](10-explained-alerts-and-digests.md) | Product | 7 |
