@@ -1,6 +1,6 @@
 """T011: verifica que cada migración tiene un downgrade que funciona.
 
-Corre contra una base de datos de test separada (`bo_ia_test`), creada y
+Corre contra una base de datos de test separada (`bo_ia_test_migrations`), creada y
 destruida en cada corrida, para no tocar los datos de desarrollo.
 """
 import os
@@ -15,7 +15,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 ADMIN_DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://bo_ia:dev_only_change_me@localhost:9100/bo_ia"
 )
-TEST_DB_NAME = "bo_ia_test"
+TEST_DB_NAME = "bo_ia_test_migrations"  # not the one of the other tests, which it would drop
 
 
 def _admin_dsn() -> str:
@@ -66,8 +66,8 @@ def test_each_revision_downgrades_one_step_cleanly(alembic_config: Config) -> No
     # (Etapa 2), usuarios/suscripciones (Etapa 3), entregas_notificacion
     # (Etapa 4), notice segmentation (plan 7),
     # asynchronous matching (plan 3), change tracking of documents (plan 4),
-    # run states and changed count (plan 15).
-    for _ in range(13):
+    # run states and changed count (plan 15), notifications (plan 10).
+    for _ in range(14):
         command.downgrade(alembic_config, "-1")
     command.upgrade(alembic_config, "head")
 
@@ -164,4 +164,40 @@ def test_run_states_downgrade_keeps_the_runs(alembic_config: Config) -> None:
     with psycopg.connect(url, autocommit=True) as conn:
         states = conn.execute("SELECT estado FROM ejecuciones_fuente ORDER BY id").fetchall()
         assert states == [("completada",), ("fallida",)]
+    command.upgrade(alembic_config, "head")
+
+
+def test_notifications_migration_does_not_send_old_emails(alembic_config: Config) -> None:
+    """An email that was interrupted before the outbox existed would go out now,
+    perhaps months later."""
+    command.upgrade(alembic_config, "f7c2b9d4e6a1")
+    url = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+    with psycopg.connect(url, autocommit=True) as conn:
+        vector = "[" + ",".join(["0.1"] * 1024) + "]"
+        one = lambda q, *a: conn.execute(q, a).fetchone()[0]  # noqa: E731
+        source = one("INSERT INTO fuentes (clave, nombre) VALUES ('f', 'f') RETURNING id")
+        document = one(
+            "INSERT INTO documentos (fuente_id, identificador_externo, fecha, texto, url_fuente, hash_contenido) "
+            "VALUES (%s, 'a', '2026-01-01', 't', 'u', 'h') RETURNING id", source,
+        )  # fmt: skip
+        user = one("INSERT INTO usuarios (email, password_hash) VALUES ('a', 'x') RETURNING id")
+        subscription = one(
+            "INSERT INTO suscripciones (usuario_id, texto_busqueda, embedding) VALUES (%s, 'x', %s) RETURNING id",
+            user, vector,
+        )  # fmt: skip
+        match = one(
+            "INSERT INTO evaluaciones_match (documento_id, suscripcion_id, score, fecha_evaluacion) "
+            "VALUES (%s, %s, 1, now()) RETURNING id", document, subscription,
+        )  # fmt: skip
+        for channel, state in (("correo", "pendiente"), ("bandeja", "entregada")):
+            conn.execute(
+                "INSERT INTO entregas_notificacion (match_id, canal, estado) VALUES (%s, %s, %s)", (match, channel, state)
+            )
+    command.upgrade(alembic_config, "head")
+    with psycopg.connect(url, autocommit=True) as conn:
+        rows = conn.execute("SELECT canal, estado FROM entregas_notificacion ORDER BY canal").fetchall()
+        assert rows == [("bandeja", "entregada"), ("correo", "fallida")]
+        assert conn.execute("SELECT frecuencia_notificacion FROM suscripciones").fetchall() == [("immediate",)]
+        conn.execute("UPDATE entregas_notificacion SET estado = 'pendiente' WHERE canal = 'correo'")
+    command.downgrade(alembic_config, "f7c2b9d4e6a1")
     command.upgrade(alembic_config, "head")

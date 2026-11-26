@@ -8,9 +8,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from sqlalchemy import literal, not_, select, update
 from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import Session
@@ -67,6 +68,17 @@ class InstallationConfig(BaseModel):
     # vertical no debe recibirlos. Default `True` para no cambiar el
     # comportamiento de la instalación de boletines ya existente.
     seed: bool = True
+    # Of the periods of the digests.
+    timezone: str = "UTC"
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"unknown time zone {value!r}") from exc
+        return value
 
 
 def cargar_installation_config(ruta: str | Path) -> InstallationConfig:

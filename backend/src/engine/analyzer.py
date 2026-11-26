@@ -26,6 +26,8 @@ def stem(word: str) -> str:
             return word[:-4]
         if word.endswith("ces"):
             return word[:-3] + "z"
+        if word[-2] in "oa" and len(word) == MIN_STEMMED:  # "obras": its singular is too short to lose its vowel
+            return word[:-1]
         if word[-2] in "oae":
             return word[:-2]
     return word

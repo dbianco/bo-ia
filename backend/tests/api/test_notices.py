@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_embedder, get_installation_config, get_session
@@ -166,11 +166,13 @@ def test_an_unknown_issue_is_not_found(db_session: Session, make_client, path) -
 
 
 def test_an_alert_says_where_to_find_the_notice(db_session: Session, make_client, monkeypatch) -> None:
+    from src.config.installation import InstallationConfig
     from src.db.models import Suscripcion
-    from src.notifications import dispatcher
+    from src.notifications import outbox
+    from src.notifications.settings import settings_from_environment
 
     sent = []
-    monkeypatch.setattr(dispatcher, "enviar_correo", lambda **mail: sent.append(mail))
+    monkeypatch.setattr(outbox, "enviar_correo", lambda **mail: sent.append(mail))
     client = make_client()
     user = Usuario(email="a@example.org", password_hash="x")
     db_session.add(user)
@@ -183,6 +185,10 @@ def test_an_alert_says_where_to_find_the_notice(db_session: Session, make_client
     monkeypatch.setenv("SIMILARITY_THRESHOLD", "0.2")
     _gazette(db_session)
     drain_matching_queue(db_session)
+    # The fixture is a local file, and emails only have links to the web.
+    db_session.execute(update(Documento).values(url_fuente="https://example.org/4.pdf#page=4"))
+    db_session.commit()
+    outbox.send_pending(db_session, settings_from_environment(InstallationConfig(nombre="x")))
     assert len(sent) == 1
     assert "Aviso Nº 688769" in sent[0]["cuerpo"]
     assert "Páginas 4 a 5" in sent[0]["cuerpo"]

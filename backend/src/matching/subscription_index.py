@@ -16,6 +16,8 @@ from src.matching.filter_index import FilterIndex
 from src.vector.hnsw import DEFAULT_SLACK, DEFAULT_UPPER_EF, GRAPH_FROM, VectorIndex
 
 DEFAULT_EF = 32
+BEST_CHUNK = 4096
+TIE_DECIMALS = 6
 
 
 class SubscriptionIndex:
@@ -134,6 +136,18 @@ class SubscriptionIndex:
     def match_exactly(self, metadata: dict, fragments: np.ndarray, threshold: float) -> dict[int, float]:
         """Like `match`, looking at every subscription that passes the filters."""
         return self._match(metadata, fragments, threshold, exact_below=len(self._vectors))
+
+    def best_fragments(self, identifiers: Sequence[int], fragments: np.ndarray) -> dict[int, int]:
+        """Which fragment is the nearest to each subscription: the first, if several tie."""
+        fragments = _unit(np.asarray(fragments, dtype=np.float32).reshape(-1, self._dim))
+        with self._lock:
+            best: dict[int, int] = {}
+            for start in range(0, len(identifiers), BEST_CHUNK):
+                chunk = identifiers[start : start + BEST_CHUNK]
+                rows = np.array([self._row_of[i] for i in chunk], dtype=np.int64)
+                scores = np.round(self._vectors.vectors[rows] @ fragments.T, TIE_DECIMALS)
+                best.update(zip(chunk, scores.argmax(axis=1).tolist(), strict=True))
+            return best
 
     def vectors_in_order(self) -> np.ndarray:
         """The stored vectors, by row."""

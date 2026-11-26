@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Avisos — {{ config.nombre }}{% endblock %}
+{% block heading %}Avisos{% endblock %}
+{% block content %}
+<div class="acciones">
+  {% if only_unread %}<a href="/bandeja">Ver todos</a>{% else %}<a href="/bandeja?sin_leer=1">Ver solo sin leer</a>{% endif %}
+  {% if unread %}<form method="post" action="/bandeja/leer-todo"><button type="submit" class="enlace">Marcar todos como leídos</button></form>{% endif %}
+</div>
+{% if not entries %}<p role="status">No tenés avisos{{ " sin leer" if only_unread }}.</p>{% endif %}
+<ul class="resultados-lista">
+  {% for e in entries %}
+  <li class="aviso resultado{{ "" if e.read_at else " sin-leer" }}">
+    <p class="resultado-fecha">
+      {{ e.fecha | fecha }}
+      {% if e.notice_number %}· Aviso Nº {{ e.notice_number }}{% endif %}
+      {% if e.first_page %}· {% if e.first_page == e.last_page %}página {{ e.first_page }}{% else %}páginas {{ e.first_page }} a {{ e.last_page }}{% endif %}{% endif %}
+      · similitud {{ e.score | decimal }}
+      {% if not e.read_at %}<span class="badge-texto">sin leer</span>{% endif %}
+    </p>
+    <p class="resultado-titulo">
+      {% set url = e.url_fuente | safe_url %}
+      {% if url %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ e.titulo or "Ver documento" }}</a>{% else %}{{ e.titulo or "Documento" }}{% endif %}
+    </p>
+    <blockquote class="extracto">{% for p in e.excerpt %}{% if p.match %}<mark>{{ p.text }}</mark>{% else %}{{ p.text }}{% endif %}{% endfor %}</blockquote>
+    <p class="resultado-fecha">
+      Suscripción: {{ e.texto_busqueda }}
+      {% for key, value in e.filtros.items() %}· {{ key }}: {{ value }}{% endfor %}
+      · {% if e.shared_words %}palabras en común: {{ e.shared_words | join(", ") }}{% else %}coincide por su significado{% endif %}
+    </p>
+    {% if not e.read_at %}
+    <form method="post" action="/bandeja/{{ e.id }}/leer"><button type="submit" class="enlace">Marcar como leído</button></form>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% if following %}<p><a href="{{ following }}">Más avisos</a></p>{% endif %}
+{% endblock %}

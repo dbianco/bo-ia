@@ -79,7 +79,7 @@ Measured on generated issues with known notice boundaries, laid out like the rea
 Implemented. Not marked as done yet, because these checks are pending:
 
 - The count of the fixture was made by looking at the rendered pages, but by the assistant that wrote the code. A person has to confirm it.
-- `pytest -m slow`, `-m docker` and `-m live` have not been run. In particular, sections 1, 2, 3 and 5 of the real gazette have not been seen.
+- The test of the real model (`pytest -m slow`), `-m docker` and `-m live` have not been run. In particular, sections 1, 2, 3 and 5 of the real gazette have not been seen.
 
 | Criterion | Result | Test |
 |---|---|---|

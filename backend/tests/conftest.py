@@ -53,7 +53,7 @@ def _truncar_tablas(database_url: str) -> None:
     with psycopg.connect(plain, autocommit=True) as conn, conn.cursor() as cur:
         cur.execute(
             "TRUNCATE TABLE valoraciones, fragmento_tags, fragmentos, tags, documentos, fuentes, "
-            "usuarios, matching_state "
+            "usuarios, matching_state, digests "
             "RESTART IDENTITY CASCADE"
         )
 
@@ -78,3 +78,11 @@ def drain_matching_queue(session: Session) -> None:
     from src.matching.queue import process_queue
 
     process_queue(session, IndexedMatcher())
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Every test starts with no calls counted."""
+    from src.api.rate_limit import limiter
+
+    limiter.reset()

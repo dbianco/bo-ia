@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ContextCrawl is a semantic search and monitoring engine for sources that publish documents regularly (official gazettes, tender portals). One engine runs several independent installations, each with its own sources, filters, database and users. A new subject area is added through configuration plus connectors, not by forking the engine.
 
 - `backend/`: Python 3.12, FastAPI, SQLAlchemy, PostgreSQL + pgvector. Ingestion, search, scheduler, subscriptions and notifications all run in one service.
-- `web/`: separate Jinja2 + htmx app that only talks to the backend over HTTP. It covers search and result feedback, not accounts or subscriptions. It has no tests, no `pyproject.toml` (dependencies are listed in its Dockerfile) and is not linted in CI.
+- `web/`: separate Jinja2 + htmx app that only talks to the backend over HTTP. It covers search, result feedback, accounts, subscriptions and the inbox. Its tests are in `backend/tests/web/` and run it against the real API; it has no `pyproject.toml` (dependencies are listed in its Dockerfile).
 
 ## Language
 
@@ -63,7 +63,7 @@ Migrations: `alembic upgrade head` runs from `backend/entrypoint.sh` on every co
 - Deduplication is by `(fuente, identificador_externo)`, then by content hash and date across all sources. The same text on another date is another document. Ingesting a document that exists in `estado="error"` processes it again from the stored row. Any other existing row counts as already ingested; one that arrives with other content is reported (`changed`, `src/ingestor/changes.py`) and not overwritten, apart from metadata keys it did not have.
 - The fixed metadata of the source (`fuentes.config["metadata"]`, from `installation.yaml`) is merged into every document. A value of the document wins.
 - `searchable=False` stores a document without fragments (`estado="not_searchable"`).
-- A genuinely new complete document is queued in `matching_queue`, in the same transaction. `MatchingWorker` (`src/matching/worker.py`, a thread started by the backend) processes it with `process_queue`: a `Matcher` finds the subscriptions, `match_document` records the matches and calls `crear_entregas_para_match` (`src/notifications/dispatcher.py`), which sends SMTP. Ingestion waits for none of it. A failed email is recorded as `fallida`; there is no automatic retry. Tests that need the matches call `drain_matching_queue` (`tests/conftest.py`).
+- A genuinely new complete document is queued in `matching_queue`, in the same transaction. `MatchingWorker` (`src/matching/worker.py`, a thread started by the backend) processes it with `process_queue`: a `Matcher` finds the subscriptions, `match_document` records the matches and their deliveries (`crear_entregas_para_match`) in one transaction. Nothing of that sends email. Tests that need the matches call `drain_matching_queue` (`tests/conftest.py`).
 
 ### Connectors
 
@@ -96,6 +96,14 @@ A subscription stores a snapshot of each filter's type and value, so later confi
 
 `src/matching/matchers.py` has the two implementations (`MATCHING_ENGINE`): `SqlLoopMatcher`, the reference, and `IndexedMatcher` (default), which keeps a `SubscriptionIndex` in memory: `FilterIndex` (exact, must agree with `cumple_filtros`) and `src/vector/hnsw.py`. Indexes in memory are kept current through `changed_xid` columns written by triggers: read `pg_snapshot_xmin` first and then the rows. `Suscripcion.ultima_evaluacion` is computed from `matching_state`; do not write it.
 
+### Notifications
+
+`NotificationWorker` (`src/notifications/worker.py`) builds digests (`digests.py`) and sends what is pending (`outbox.py`): it claims a row with a lease, sends and records. Functions take a `clock`, for the tests. `explain.py` says what matched and why, for the emails (`render.py`) and the inbox. Text from documents and subscriptions is untrusted: escape it, and only make links of `http(s)` addresses.
+
+### Public endpoints
+
+`src/api/rate_limit.py` limits the routes in `GROUPS_BY_ROUTE`, by address; a new public route must be added there (a test checks it). Every environment variable must be in the README, both `.env` examples and compose (`tests/test_documentation.py`).
+
 ### Search
 
 `GET /v1/search` goes through a `SearchBackend` (`src/engine/backend.py`, `SEARCH_ENGINE`): PostgreSQL by default, or the in-process engine in `src/engine/`. The tests of the search API run on both (`tests/api/conftest.py`).
@@ -125,7 +133,7 @@ Authentication uses server-side sessions with an HttpOnly cookie. `GET /v1/searc
 - The embedding dimension (1024) is defined in both `src/db/models.py` and `src/processor/embeddings.py`.
 - Every migration needs a working downgrade. `tests/test_migrations.py` steps down a hardcoded number of revisions, so increase it when you add one.
 - Indexes created by raw SQL in a migration are also declared on the model, to avoid `alembic check` drift.
-- `tests/conftest.py` drops and recreates the `bo_ia_test` database. `test_migrations.py` uses the same name, so do not run two pytest sessions at once.
+- `tests/conftest.py` drops and recreates the `bo_ia_test` database, and `test_migrations.py` its own. Do not run two pytest sessions at once.
 - Test isolation is by `TRUNCATE ... CASCADE`, because the code under test commits. Add a new table to that list if the cascade does not reach it.
 
 ## Workflow and plans

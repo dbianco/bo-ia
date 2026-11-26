@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import os
 from threading import Lock
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 import numpy as np
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from src.db.models import EMBEDDING_DIM, Documento, Fragmento, Suscripcion
@@ -19,9 +19,15 @@ from src.search.filters import cumple_filtros
 LOAD_CHUNK = 2_000
 
 
+class Found(NamedTuple):
+    subscription_id: int
+    score: float
+    fragment_id: int | None = None  # the fragment with that score; the first one if several tie
+
+
 class Matcher(Protocol):
-    def match(self, session: Session, document: Documento, threshold: float) -> list[tuple[int, float]]:
-        """(subscription, score) of the active subscriptions that match."""
+    def match(self, session: Session, document: Documento, threshold: float) -> list[Found]:
+        """The active subscriptions that match."""
         ...
 
 
@@ -29,7 +35,7 @@ class SqlLoopMatcher:
     """For each active subscription: applies its filters and, if the document
     passes, asks for its best similarity to the fragments."""
 
-    def match(self, session: Session, document: Documento, threshold: float) -> list[tuple[int, float]]:
+    def match(self, session: Session, document: Documento, threshold: float) -> list[Found]:
         matches = []
         subscriptions = session.execute(
             select(Suscripcion.id, Suscripcion.embedding, Suscripcion.filtros)
@@ -40,13 +46,14 @@ class SqlLoopMatcher:
             if not cumple_filtros(document.metadata_ or {}, filters):
                 continue
             distance = Fragmento.embedding.cosine_distance(embedding)
-            best = session.scalar(
-                select(func.min(distance)).where(
-                    Fragmento.documento_id == document.id, Fragmento.embedding.is_not(None)
-                )
-            )
-            if best is not None and 1.0 - best >= threshold:
-                matches.append((identifier, 1.0 - best))
+            best = session.execute(
+                select(Fragmento.id, distance)
+                .where(Fragmento.documento_id == document.id, Fragmento.embedding.is_not(None))
+                .order_by(distance, Fragmento.posicion)
+                .limit(1)
+            ).one_or_none()
+            if best is not None and 1.0 - best[1] >= threshold:
+                matches.append(Found(identifier, 1.0 - best[1], best[0]))
         return matches
 
 
@@ -61,22 +68,25 @@ class IndexedMatcher:
         self._seen_up_to = 0  # every transaction before this one is in the index
         self._lock = Lock()
 
-    def match(self, session: Session, document: Documento, threshold: float) -> list[tuple[int, float]]:
+    def match(self, session: Session, document: Documento, threshold: float) -> list[Found]:
         self.sync(session)
-        embeddings = session.scalars(
-            select(Fragmento.embedding).where(
-                Fragmento.documento_id == document.id, Fragmento.embedding.is_not(None)
-            )
+        rows = session.execute(
+            select(Fragmento.id, Fragmento.embedding)
+            .where(Fragmento.documento_id == document.id, Fragmento.embedding.is_not(None))
+            .order_by(Fragmento.posicion)
         ).all()
-        if not embeddings:
+        if not rows:
             return []
-        fragments = np.array(embeddings, dtype=np.float32)
+        fragments = np.array([embedding for _, embedding in rows], dtype=np.float32)
         found = sorted(self._index.match(document.metadata_ or {}, fragments, threshold).items())
+        best = self._index.best_fragments([identifier for identifier, _ in found], fragments)
         alive = self._alive(session, [identifier for identifier, _ in found])
         for identifier, _ in found:
             if identifier not in alive:
                 self._index.remove(identifier)
-        return [(identifier, score) for identifier, score in found if identifier in alive]
+        return [
+            Found(identifier, score, rows[best[identifier]][0]) for identifier, score in found if identifier in alive
+        ]
 
     def sync(self, session: Session) -> int:
         """Brings the index up to date. Returns how many subscriptions changed in it."""

@@ -4,6 +4,8 @@
 # agregan acá, no en el motor.
 
 nombre: Boletines Córdoba
+# When a day begins and ends, for the daily and weekly digests.
+timezone: America/Argentina/Cordoba
 
 fuentes:
   - clave: cordoba-provincial

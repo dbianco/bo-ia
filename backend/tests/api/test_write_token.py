@@ -177,13 +177,18 @@ def test_every_route_that_writes_is_known() -> None:
         ("POST", "/v1/suscripciones/{suscripcion_id}/pausar"),
         ("POST", "/v1/suscripciones/{suscripcion_id}/reanudar"),
         ("DELETE", "/v1/suscripciones/{suscripcion_id}"),
+        ("PATCH", "/v1/suscripciones/{suscripcion_id}"),
+        ("POST", "/v1/notificaciones/read"),
+        ("POST", "/v1/notificaciones/{entrega_id}/read"),
     }
-    # On purpose: registering, signing in and out, and rating a search result.
+    # On purpose: registering, signing in and out, rating a search result, and
+    # pausing with the signed link of an email.
     anybody = {
         ("POST", "/v1/auth/registro"),
         ("POST", "/v1/auth/login"),
         ("POST", "/v1/auth/logout"),
         ("POST", "/v1/valoraciones"),
+        ("POST", "/v1/pause-links"),
     }
     found = {
         (method.upper(), path)

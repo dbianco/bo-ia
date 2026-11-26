@@ -292,6 +292,7 @@ class Sesion(Base):
 
 
 ESTADOS_SUSCRIPCION = ("activa", "pausada")
+FREQUENCIES = ("immediate", "daily", "weekly")
 
 
 class Suscripcion(Base):
@@ -313,7 +314,8 @@ class Suscripcion(Base):
     filtros: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     estado: Mapped[str] = mapped_column(String(16), nullable=False, server_default="activa")
     canales: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
-    frecuencia_notificacion: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Of the emails; the inbox never waits.
+    frecuencia_notificacion: Mapped[str] = mapped_column(String(32), nullable=False, server_default="immediate")
     # Last evaluation before it was paused. Read `ultima_evaluacion`, below,
     # which also knows about an active subscription without writing to its row.
     ultima_evaluacion_guardada: Mapped[datetime.datetime | None] = mapped_column(
@@ -334,6 +336,7 @@ class Suscripcion(Base):
 
     __table_args__ = (
         CheckConstraint(f"estado IN {ESTADOS_SUSCRIPCION}", name="ck_suscripcion_estado"),
+        CheckConstraint(f"frecuencia_notificacion IN {FREQUENCIES}", name="ck_suscripcion_frecuencia"),
         Index("ix_suscripciones_changed_xid", "changed_xid"),
     )
 
@@ -397,11 +400,16 @@ class EvaluacionMatch(Base):
     suscripcion_id: Mapped[int] = mapped_column(
         ForeignKey("suscripciones.id", ondelete="CASCADE"), nullable=False
     )
+    # The fragment with that score. None in matches from before it was recorded.
+    fragmento_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fragmentos.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     score: Mapped[float] = mapped_column(nullable=False)
     filtros_aplicados: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     fecha_evaluacion: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     documento: Mapped[Documento] = relationship()
+    fragmento: Mapped[Fragmento | None] = relationship()
     suscripcion: Mapped[Suscripcion] = relationship(back_populates="matches")
     entregas: Mapped[list[EntregaNotificacion]] = relationship(
         back_populates="match", cascade="all, delete-orphan"
@@ -421,9 +429,8 @@ CANALES_NOTIFICACION = ("bandeja", "correo")
 class EntregaNotificacion(Base):
     """Un intento de notificar un match por un canal (sección 4.6 del
     design spec, Etapa 4): a lo sumo una entrega por par (match, canal).
-    `reintentos` queda en el modelo para un reintento manual futuro; en
-    esta etapa nada lo incrementa todavía (no hay reintento automático,
-    ver `spec.md`)."""
+    Written with the match. An email waits as `pendiente` until the outbox
+    sends it, on its own or as part of a digest."""
 
     __tablename__ = "entregas_notificacion"
 
@@ -436,6 +443,16 @@ class EntregaNotificacion(Base):
     fecha_intento: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reintentos: Mapped[int] = mapped_column(nullable=False, server_default="0")
     error_proveedor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Of the subscription when it matched.
+    frequency: Mapped[str] = mapped_column(String(16), nullable=False, server_default="immediate")
+    digest_id: Mapped[int | None] = mapped_column(
+        ForeignKey("digests.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Also the lease: a worker that takes a row moves it to the future.
+    next_attempt_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    read_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -445,5 +462,40 @@ class EntregaNotificacion(Base):
     __table_args__ = (
         CheckConstraint(f"canal IN {CANALES_NOTIFICACION}", name="ck_entrega_notificacion_canal"),
         CheckConstraint(f"estado IN {ESTADOS_ENTREGA}", name="ck_entrega_notificacion_estado"),
+        CheckConstraint(f"frequency IN {FREQUENCIES}", name="ck_entrega_notificacion_frequency"),
         UniqueConstraint("match_id", "canal", name="uq_entrega_notificacion_match_canal"),
+        Index(
+            "ix_entregas_notificacion_pendientes",
+            "next_attempt_at",
+            postgresql_where=text("estado = 'pendiente'"),
+        ),
+    )
+
+
+class Digest(Base):
+    """One email with the matches of a user in a period. Which ones they are is in
+    `entregas_notificacion.digest_id`."""
+
+    __tablename__ = "digests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(16), nullable=False)
+    period_end: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    estado: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pendiente")
+    fecha_intento: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reintentos: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    error_proveedor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_attempt_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint(f"estado IN {ESTADOS_ENTREGA}", name="ck_digest_estado"),
+        CheckConstraint("frequency IN ('daily', 'weekly')", name="ck_digest_frequency"),
+        # Running it twice does not make it twice.
+        UniqueConstraint("usuario_id", "frequency", "period_end", name="uq_digest_usuario_frequency_period"),
     )

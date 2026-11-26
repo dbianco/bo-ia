@@ -62,7 +62,7 @@ Measured on the synthetic corpus from plan 1, against the brute-force reference:
 
 ## Status
 
-Implemented. Not marked as done yet: `pytest -m slow` and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
 
 | Criterion | Result | Test |
 |---|---|---|

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% set new = action == "/registro" %}
+{% block title %}{{ "Crear cuenta" if new else "Ingresar" }} — {{ config.nombre }}{% endblock %}
+{% block heading %}{{ "Crear cuenta" if new else "Ingresar" }}{% endblock %}
+{% block content %}
+<form method="post" action="{{ action }}" class="formulario">
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  <label for="email">Correo electrónico</label>
+  <input type="email" id="email" name="email" value="{{ email }}" required autocomplete="username">
+  <label for="password">Contraseña{% if new %} (8 caracteres o más){% endif %}</label>
+  <input
+    type="password"
+    id="password"
+    name="password"
+    required
+    {% if new %}minlength="8"{% endif %}
+    autocomplete="{{ 'new-password' if new else 'current-password' }}"
+  >
+  <button type="submit" class="boton">{{ "Crear cuenta" if new else "Ingresar" }}</button>
+</form>
+{% if new %}
+<p>¿Ya tenés cuenta? <a href="/ingresar">Ingresar</a></p>
+{% else %}
+<p>¿No tenés cuenta? <a href="/registro">Crear cuenta</a></p>
+{% endif %}
+{% endblock %}

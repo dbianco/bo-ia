@@ -71,7 +71,7 @@ Measured on the synthetic corpus from plan 1 at a proposed scale of 1,000,000 fr
 
 ## Status
 
-Implemented. One criterion is not met at full scale, and the owner accepted the result as it is (see Quality). Not marked as done yet: `pytest -m slow` and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+Implemented. One criterion is not met at full scale, and the owner accepted the result as it is (see Quality). Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
 
 | Criterion | Result | Test |
 |---|---|---|
@@ -82,6 +82,8 @@ Implemented. One criterion is not met at full scale, and the owner accepted the 
 | Curve of recall and latency for three widths or more | Below | `tests/benchmark/test_scale_search.py` |
 
 ### Numbers
+
+Measured before a fix of the analyzer for short plurals such as "obras" (plan 10).
 
 Gazette profile, seed 42, 868,000 documents, 1,000,380 fragments, 200 queries. Hashed provider, dimension 1024, synonym coverage 0.8, threshold 0.45. Four virtual CPUs, Intel Xeon (Ice Lake) at 2.60 GHz, 15 GB. Building everything, with the embedding, takes 25 minutes.
 

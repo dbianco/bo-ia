@@ -8,10 +8,9 @@ from sqlalchemy.orm import Session
 
 from src.db.models import EntregaNotificacion, EvaluacionMatch, MatchingQueue
 from src.ingestor.contract import DocumentoNormalizado, ErrorDeProcesamiento, ingerir_documento
-from src.matching.matchers import IndexedMatcher, SqlLoopMatcher
+from src.matching.matchers import Found, IndexedMatcher, SqlLoopMatcher
 from src.matching.queue import process_queue
 from src.matching.worker import MatchingWorker
-from src.notifications import dispatcher
 from tests.matching.conftest import axis
 
 
@@ -182,7 +181,7 @@ def test_a_subscription_deleted_or_paused_meanwhile_gets_no_match(db_session: Se
 
     class Fixed:
         def match(self, *args):
-            return [(gone_id, 1.0), (paused_id, 1.0), (kept_id, 0.9), (987654, 1.0)]
+            return [Found(gone_id, 1.0), Found(paused_id, 1.0), Found(kept_id, 0.9), Found(987654, 1.0)]
 
     db_session.delete(gone)
     paused.estado = "pausada"
@@ -198,21 +197,25 @@ def test_a_reported_match_is_checked_against_the_filter(db_session: Session, sub
 
     class Wrong:
         def match(self, *args):
-            return [(wrong_id, 1.0)]
+            return [Found(wrong_id, 1.0)]
 
     wrong_id = wrong.id
     process_queue(db_session, Wrong())
     assert _matches(db_session) == []
 
 
-def test_a_slow_mail_server_does_not_slow_ingestion(db_session: Session, matcher, subscribe, ingest, monkeypatch) -> None:
+def test_neither_ingestion_nor_matching_sends_email(db_session: Session, matcher, subscribe, ingest, monkeypatch) -> None:
+    """So they cannot wait for the mail server."""
+    from src.notifications import outbox
+
     subscribe(canales=["correo"])
     sent = []
-    monkeypatch.setattr(dispatcher, "enviar_correo", lambda **mail: sent.append(mail))
+    monkeypatch.setattr(outbox, "enviar_correo", lambda **mail: sent.append(mail))
     ingest()
-    assert sent == [], "ingestion does not send email, so it cannot wait for it"
     process_queue(db_session, matcher)
-    assert len(sent) == 1
+    assert sent == []
+    (delivery,) = db_session.scalars(select(EntregaNotificacion)).all()
+    assert delivery.estado == "pendiente"
 
 
 # --- ultima_evaluacion ---

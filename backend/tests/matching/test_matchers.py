@@ -18,7 +18,7 @@ def matcher(request):
 
 
 def _ids(matcher, session, document, threshold=0.5) -> dict[int, float]:
-    return {i: round(score, 4) for i, score in matcher.match(session, document, threshold)}
+    return {f.subscription_id: round(f.score, 4) for f in matcher.match(session, document, threshold)}
 
 
 def test_matches_by_meaning_and_filters(db_session: Session, matcher, subscribe, ingest) -> None:

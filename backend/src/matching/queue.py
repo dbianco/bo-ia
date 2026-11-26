@@ -8,7 +8,7 @@ import logging
 
 from sqlalchemy import exists, func, select, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from src.db.models import (
     Documento,
@@ -18,7 +18,7 @@ from src.db.models import (
     MatchingState,
     Suscripcion,
 )
-from src.matching.matchers import Matcher
+from src.matching.matchers import Found, Matcher
 from src.notifications.dispatcher import crear_entregas_para_match
 from src.processor.threshold import umbral_configurado
 from src.search.filters import cumple_filtros
@@ -82,8 +82,8 @@ def process_queue(session: Session, matcher: Matcher, *, limit: int | None = Non
 
 
 def match_document(session: Session, document: Documento, matcher: Matcher) -> None:
-    """Finds the matches of a document, records them and notifies. Doing it
-    again for the same document adds nothing."""
+    """Finds the matches of a document, and records them with their deliveries.
+    Doing it again for the same document adds nothing."""
     # The clock of the database, which is also the one of the subscriptions. Taken
     # first: a subscription created after it may not be considered.
     now = session.scalar(text("SELECT clock_timestamp()"))
@@ -95,53 +95,52 @@ def match_document(session: Session, document: Documento, matcher: Matcher) -> N
     session.commit()
 
 
-def _record(
-    session: Session, document: Documento, found: list[tuple[int, float]], now: datetime.datetime
-) -> None:
+def _record(session: Session, document: Documento, found: list[Found], now: datetime.datetime) -> None:
     document_id, metadata = document.id, document.metadata_ or {}
-    _finish_interrupted(session, document_id)
+    _finish_interrupted(session, document_id, now)
     recorded = set(
         session.scalars(select(EvaluacionMatch.suscripcion_id).where(EvaluacionMatch.documento_id == document_id))
     )
-    scores = {identifier: score for identifier, score in found if identifier not in recorded}
-    identifiers = sorted(scores)
+    by_subscription = {f.subscription_id: f for f in found if f.subscription_id not in recorded}
+    identifiers = sorted(by_subscription)
     for start in range(0, len(identifiers), CHUNK):
         # The rows decide, not the index: one may have been deleted, paused or
         # changed since. Locked so that none disappears before its match exists.
-        rows = session.execute(
-            select(Suscripcion.id, Suscripcion.filtros)
+        subscriptions = session.scalars(
+            select(Suscripcion)
             .where(Suscripcion.id.in_(identifiers[start : start + CHUNK]), Suscripcion.estado == "activa")
+            .options(defer(Suscripcion.embedding))
             .order_by(Suscripcion.id)
             .with_for_update(key_share=True, read=True)
+            .execution_options(populate_existing=True)
         ).all()
         matches = [
             EvaluacionMatch(
                 documento_id=document_id,
-                suscripcion_id=identifier,
-                score=round(scores[identifier], 4),
-                filtros_aplicados=filters,
+                suscripcion=subscription,
+                fragmento_id=by_subscription[subscription.id].fragment_id,
+                score=round(by_subscription[subscription.id].score, 4),
+                filtros_aplicados=subscription.filtros,
                 fecha_evaluacion=now,
             )
-            for identifier, filters in rows
-            if cumple_filtros(metadata, filters)
+            for subscription in subscriptions
+            if cumple_filtros(metadata, subscription.filtros)
         ]
         session.add_all(matches)
         session.flush()
-        match_ids = [match.id for match in matches]
+        for match in matches:
+            crear_entregas_para_match(session, match, now=now)
+        # The matches and their deliveries, together. Sending is of the outbox.
         session.commit()
-        for match_id in match_ids:
-            match = session.get(EvaluacionMatch, match_id)
-            if match is not None:  # the subscription may be deleted at any time
-                crear_entregas_para_match(session, match)
 
 
-def _finish_interrupted(session: Session, document_id: int) -> None:
-    """Matches that a crash left without notifications."""
+def _finish_interrupted(session: Session, document_id: int, now: datetime.datetime) -> None:
+    """Matches without notifications, from when they were not written together."""
     without = session.scalars(
-        select(EvaluacionMatch.id).where(
+        select(EvaluacionMatch).where(
             EvaluacionMatch.documento_id == document_id,
             ~exists().where(EntregaNotificacion.match_id == EvaluacionMatch.id),
         )
     ).all()
-    for match_id in without:
-        crear_entregas_para_match(session, session.get(EvaluacionMatch, match_id))
+    for match in without:
+        crear_entregas_para_match(session, match, now=now)

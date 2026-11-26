@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src.db.models import Documento, EntregaNotificacion, EvaluacionMatch, Fuente, Suscripcion, Usuario
 from src.notifications.dispatcher import crear_entregas_para_match
 from src.notifications.email import EnvioCorreoFallido
+from src.notifications.outbox import send_pending
 
 
 @pytest.fixture()
@@ -78,10 +79,11 @@ def test_sin_canales_declarados_crea_una_entrega_bandeja(db_session: Session, ma
     assert entregas[0].estado == "entregada"
 
 
-def test_bandeja_no_llama_a_smtp(db_session: Session, match) -> None:
-    m = match(canales=["bandeja"])
+def test_crear_entregas_no_llama_a_smtp(db_session: Session, match) -> None:
+    """Plan 10: sending is of the outbox (test_outbox.py)."""
+    m = match(canales=["bandeja", "correo"])
 
-    with patch("src.notifications.dispatcher.enviar_correo") as enviar:
+    with patch("src.notifications.outbox.enviar_correo") as enviar:
         crear_entregas_para_match(db_session, m)
 
     enviar.assert_not_called()
@@ -90,44 +92,45 @@ def test_bandeja_no_llama_a_smtp(db_session: Session, match) -> None:
 def test_dos_canales_declarados_crea_dos_entregas(db_session: Session, match) -> None:
     m = match(canales=["bandeja", "correo"])
 
-    with patch("src.notifications.dispatcher.enviar_correo"):
-        crear_entregas_para_match(db_session, m)
+    crear_entregas_para_match(db_session, m)
 
     entregas = db_session.scalars(select(EntregaNotificacion).where(EntregaNotificacion.match_id == m.id)).all()
-    assert sorted(e.canal for e in entregas) == ["bandeja", "correo"]
+    assert sorted((e.canal, e.estado) for e in entregas) == [("bandeja", "entregada"), ("correo", "pendiente")]
 
 
-def test_correo_exitoso_queda_entregada(db_session: Session, match) -> None:
-    m = match(canales=["correo"])
+def _enviar(db_session: Session, settings) -> EntregaNotificacion:
+    send_pending(db_session, settings)
+    return db_session.scalars(select(EntregaNotificacion)).one()
 
-    with patch("src.notifications.dispatcher.enviar_correo") as enviar:
-        crear_entregas_para_match(db_session, m)
+
+def test_correo_exitoso_queda_entregada(db_session: Session, match, settings) -> None:
+    crear_entregas_para_match(db_session, match(canales=["correo"]))
+
+    with patch("src.notifications.outbox.enviar_correo") as enviar:
+        entrega = _enviar(db_session, settings)
 
     enviar.assert_called_once()
-    entrega = db_session.scalar(select(EntregaNotificacion).where(EntregaNotificacion.match_id == m.id))
     assert entrega.estado == "entregada"
     assert entrega.fecha_intento is not None
 
 
-def test_correo_fallido_queda_fallida_con_error_y_no_propaga(db_session: Session, match) -> None:
-    m = match(canales=["correo"])
+def test_correo_fallido_queda_pendiente_con_error_y_no_propaga(db_session: Session, match, settings) -> None:
+    crear_entregas_para_match(db_session, match(canales=["correo"]))
 
-    with patch("src.notifications.dispatcher.enviar_correo", side_effect=EnvioCorreoFallido("SMTP caído")):
-        crear_entregas_para_match(db_session, m)  # no debe lanzar
+    with patch("src.notifications.outbox.enviar_correo", side_effect=EnvioCorreoFallido("SMTP caído")):
+        entrega = _enviar(db_session, settings)  # no debe lanzar
 
-    entrega = db_session.scalar(select(EntregaNotificacion).where(EntregaNotificacion.match_id == m.id))
-    assert entrega.estado == "fallida"
+    assert entrega.estado == "pendiente"  # plan 10: it is tried again
     assert entrega.error_proveedor == "SMTP caído"
 
 
-def test_error_inesperado_en_el_envio_tampoco_propaga(db_session: Session, match) -> None:
-    m = match(canales=["correo"])
+def test_error_inesperado_en_el_envio_tampoco_propaga(db_session: Session, match, settings) -> None:
+    crear_entregas_para_match(db_session, match(canales=["correo"]))
 
-    with patch("src.notifications.dispatcher.enviar_correo", side_effect=RuntimeError("bug inesperado")):
-        crear_entregas_para_match(db_session, m)  # no debe lanzar
+    with patch("src.notifications.outbox.enviar_correo", side_effect=RuntimeError("bug inesperado")):
+        entrega = _enviar(db_session, settings)
 
-    entrega = db_session.scalar(select(EntregaNotificacion).where(EntregaNotificacion.match_id == m.id))
-    assert entrega.estado == "fallida"
+    assert entrega.estado == "pendiente" and entrega.error_proveedor == "bug inesperado"
 
 
 def test_recrear_entregas_para_el_mismo_match_no_duplica(db_session: Session, match) -> None:

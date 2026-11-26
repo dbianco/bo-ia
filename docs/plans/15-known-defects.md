@@ -99,7 +99,7 @@ A is first because it is the only defect that lets an outsider act on the system
 
 ## Status
 
-Implemented. Not marked as done yet: `pytest -m slow` and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
 
 Each defect was reproduced first: its tests failed on the code before the fix.
 
@@ -116,7 +116,7 @@ Each defect was reproduced first: its tests failed on the code before the fix.
 ## Decisions
 
 - **Token.** One for both endpoints, `OPERATOR_TOKEN`, as `Authorization: Bearer`. It is checked before the source and the body are looked at. With no token configured both are closed, and startup says so.
-- **Other endpoints open to anonymous callers**, reviewed and left as they are, because they are part of the product: `POST /v1/valoraciones` (the web page rates results without an account; nothing reads the ratings yet, but anybody can fill the table), `POST /v1/auth/registro` (anybody can create an account, and so a subscription that sends email to the address they gave, which is not verified) and the search (each call costs an embedding). None has a rate limit. A test lists every route that writes and who may call it, so that a new one is a decision.
+- **Other endpoints open to anonymous callers**, reviewed and left as they are, because they are part of the product: `POST /v1/valoraciones` (the web page rates results without an account; nothing reads the ratings yet, but anybody can fill the table), `POST /v1/auth/registro` (anybody can create an account, and so a subscription that sends email to the address they gave, which is not verified) and the search (each call costs an embedding). They have a limit by address since plan 10 (`src/api/rate_limit.py`), set by environment variables. A test lists every route that writes and who may call it, so that a new one is a decision.
 - **Runs.** The new state is `partial`, and the new count is `changed`, a part of the existing ones. A partial run counts as done for the schedule; the failed items are retried when they arrive again. A run that discovers nothing is `completada`.
 - **First runs.** Overdue sources start 5 seconds after startup, the longest overdue first and 30 seconds apart, and two runs at once at most. A job that has to wait starts late: the library's default was to skip it.
 - **Stored documents and fixed metadata.** Added at startup from the configuration, and not by a migration, which does not know the values of each installation.

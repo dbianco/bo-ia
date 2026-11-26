@@ -44,7 +44,7 @@ The provider and its parameters are recorded in every benchmark report, since re
 
 ## Status
 
-Implemented. Not marked as done yet: `pytest -m slow`, which checks the real model, and `pytest -m docker` have not been run, because the machine had neither the model nor Docker. The model provider only gained a `describe` method.
+Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker. The model provider only gained a `describe` method.
 
 | Criterion | Result | Test |
 |---|---|---|
