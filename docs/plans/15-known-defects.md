@@ -1,4 +1,4 @@
-# 15. Fix known defects
+# 15. Fix known defects - DONE
 
 ## Goal
 
@@ -99,9 +99,7 @@ A is first because it is the only defect that lets an outsider act on the system
 
 ## Status
 
-Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
-
-Each defect was reproduced first: its tests failed on the code before the fix.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand, on the running service: both write endpoints answered 401 with no token and with a wrong one, and nothing changed. A source that had never run ran after startup; a restart before it was due did not run it; once overdue it ran after a restart and stored no duplicate. Filtering by `provincia` found the collected gazette documents. The five migrations were also applied, reverted and applied again on a copy of a database created by the previous version, with no row lost and no drift. The opening date (F) was checked with test data only: see Found meanwhile.
 
 | Criterion | Result | Test |
 |---|---|---|
@@ -128,3 +126,5 @@ Each defect was reproduced first: its tests failed on the code before the fix.
 
 - A document whose process is killed while it is being embedded stays `pendiente`, and is not retried: it cannot be told from one in progress. For plan 13.
 - A run interrupted in the same way stays `en_curso`. It does not count as done, so the source runs again after the restart.
+- Seen on 2026-11-26 and present before these changes: the national tender CSV now separates columns with `;` and has other names (`Fecha de Apertura`, `Descripcion SAF`). `comprar-gob-ar-csv` fails on all of its rows (132,658) and collects nothing. It needs its own fix, including the column of the opening date.
+- The backend does not configure logging, so its `INFO` messages, such as the one that says the search engine is ready, are never shown. Also true before.

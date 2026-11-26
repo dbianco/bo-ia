@@ -76,10 +76,9 @@ Measured on generated issues with known notice boundaries, laid out like the rea
 
 ## Status
 
-Implemented. Not marked as done yet, because these checks are pending:
+Implemented. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: the connector ingested the real issue of the fixture into 35 notices and one cover. A second count on the rendered pages gave the same 35 (2, 5, 6, 5, 6, 3, 5 and 3 by page) and the same 6 image notices; the notices opened were on the stated pages; filtering by `provincia` returned them. The real site answered 403 to every weekday tried, from this version and from the previous one, so the issue was read from the fixture.
 
-- The count of the fixture was made by looking at the rendered pages, but by the assistant that wrote the code. A person has to confirm it.
-- The test of the real model (`pytest -m slow`), `-m docker` and `-m live` have not been run. In particular, sections 1, 2, 3 and 5 of the real gazette have not been seen.
+**Not marked as done:** a person has to confirm the count of 35. Sections 1, 2, 3 and 5 of the real gazette have not been seen.
 
 | Criterion | Result | Test |
 |---|---|---|

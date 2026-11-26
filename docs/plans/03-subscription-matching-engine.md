@@ -1,4 +1,4 @@
-# 3. Subscription matching engine
+# 3. Subscription matching engine - DONE
 
 ## Goal
 
@@ -62,7 +62,7 @@ Measured on the synthetic corpus from plan 1, against the brute-force reference:
 
 ## Status
 
-Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand, on the running service: one alert for the matching document, none for the other one, and none while the subscription was paused. `scale-matching --database-url` with seed 42, 1,000,000 subscriptions and the hashed provider: recall 0.9934, precision 1.0, no difference between the scan and the loop; indexed 11.8 ms p50 and 18.2 ms p95; 29,034 times the loop with a query per subscription (extrapolated from 2,000).
 
 | Criterion | Result | Test |
 |---|---|---|

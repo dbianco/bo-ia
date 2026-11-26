@@ -1,4 +1,4 @@
-# 2. Offline embeddings
+# 2. Offline embeddings - DONE
 
 ## Goal
 
@@ -44,7 +44,7 @@ The provider and its parameters are recorded in every benchmark report, since re
 
 ## Status
 
-Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker. The model provider only gained a `describe` method.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: with the network blocked by the system sandbox and no model on disk, the benchmark ran and its report named `provider=hashed`.
 
 | Criterion | Result | Test |
 |---|---|---|

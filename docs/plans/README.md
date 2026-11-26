@@ -6,21 +6,21 @@ Each plan states the goal, what the code does today, the design, milestones, and
 
 | # | Plan | Kind | Depends on |
 |---|---|---|---|
-| 1 | [Synthetic corpus and benchmark harness](01-synthetic-corpus-and-benchmark.md) | Foundation | — |
-| 2 | [Offline embeddings](02-offline-embeddings.md) | Foundation | — |
-| 3 | [Subscription matching engine](03-subscription-matching-engine.md) | Core system | 1, 2 |
+| 1 | [Synthetic corpus and benchmark harness - DONE](01-synthetic-corpus-and-benchmark.md) | Foundation | — |
+| 2 | [Offline embeddings - DONE](02-offline-embeddings.md) | Foundation | — |
+| 3 | [Subscription matching engine - DONE](03-subscription-matching-engine.md) | Core system | 1, 2 |
 | 4 | [Hybrid ranking engine](04-hybrid-ranking-engine.md) | Core system | 1, 2 |
 | 5 | [Incremental, crash-safe index](05-incremental-crash-safe-index.md) | Extension | 3 or 4 |
 | 6 | [Near-duplicate collapsing](06-near-duplicate-collapsing.md) | Extension | 1 |
 | 7 | [Notice segmentation and citable results](07-notice-segmentation.md) | Foundation | 1 |
 | 8 | [Notice classification and field extraction](08-classification-and-field-extraction.md) | Product | 1, 7 |
 | 9 | [Entity watchlists](09-entity-watchlists.md) | Product | 1, 7 |
-| 10 | [Explained alerts, digests and reliable delivery](10-explained-alerts-and-digests.md) | Product | 7 |
+| 10 | [Explained alerts, digests and reliable delivery - DONE](10-explained-alerts-and-digests.md) | Product | 7 |
 | 11 | [Deadlines and amendments](11-deadlines-and-amendments.md) | Product | 1, 8, 10 |
 | 12 | [Subscription preview and feedback-based tuning](12-feedback-based-tuning.md) | Product | 1, 2, 10 |
 | 13 | [Source coverage and health](13-source-coverage-and-health.md) | Reliability | — |
 | 14 | [Usage and operation statistics](14-usage-and-operation-statistics.md) | Product | — |
-| 15 | [Fix known defects](15-known-defects.md) | Defects | — |
+| 15 | [Fix known defects - DONE](15-known-defects.md) | Defects | — |
 
 ## Recommended order
 
@@ -76,6 +76,8 @@ The benchmark command of plan 1, from `backend/`. It needs no database, no netwo
 ```
 
 `generate` writes the documents, the truth file and the synonym table. `run` writes `report.txt` and `report.json`, which are identical between runs with the same arguments, and `timings.json`, which is not. To measure the PostgreSQL implementation, add `--systems` with any of `postgres-semantic`, `postgres-hybrid`, `postgres-all` and `postgres-match`, and `--database-url` with the server to use. They run in a database of their own, created and dropped by the command. `scale-matching` and `scale-search` are the scale runs of plans 3 and 4: by default a million subscriptions or fragments, some 20 minutes and 10 GB each. With `--database-url` they measure PostgreSQL too (`scale-search`, only it).
+
+The PostgreSQL run of `scale-search` needs a server with several GB of shared memory to build its vector index: the 64 MB that Docker gives a container by default, as in `docker-compose.yml`, are not enough.
 
 `--provider model` uses the real model, and `precompute` saves its vectors to replay them offline with `--provider precomputed`.
 

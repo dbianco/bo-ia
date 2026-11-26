@@ -1,4 +1,4 @@
-# 10. Explained alerts, digests and reliable delivery
+# 10. Explained alerts, digests and reliable delivery - DONE
 
 ## Goal
 
@@ -75,7 +75,7 @@ Tested against a local fake SMTP server, with a controllable clock:
 
 ## Status
 
-Implemented. Not marked as done yet: the test of the real model (`pytest -m slow`) and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand, on the running service with a test mail server: with the server stopped ingestion took 0.9 s and the email stayed pending; it arrived with its excerpt once the server was back (the wait until the next attempt was skipped by editing the row). A digest arrived once, also after building and sending again; the end of its period was simulated by dating the delivery two days back. Opening the pause link did not pause, sending its form without signing in did, a forged token got 404 and a form from another site 403.
 
 | Criterion | Result | Test |
 |---|---|---|
