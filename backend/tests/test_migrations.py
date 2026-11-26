@@ -64,8 +64,8 @@ def test_each_revision_downgrades_one_step_cleanly(alembic_config: Config) -> No
     # boletines, fragmentos, tags/fragmento_tags, valoraciones, texto_tsv,
     # generalización a documentos/fuentes (Etapa 1), ejecuciones_fuente
     # (Etapa 2), usuarios/suscripciones (Etapa 3), entregas_notificacion
-    # (Etapa 4).
-    for _ in range(9):
+    # (Etapa 4), notice segmentation (plan 7).
+    for _ in range(10):
         command.downgrade(alembic_config, "-1")
     command.upgrade(alembic_config, "head")
 
@@ -118,4 +118,28 @@ def test_generalize_documentos_fuentes_preserva_datos_y_hace_backfill(alembic_co
         )
         assert cur.fetchone() == ("cordoba", "BO-MIG-001")
 
+    command.upgrade(alembic_config, "head")
+
+
+def test_notice_segmentation_downgrade_keeps_every_document(alembic_config: Config) -> None:
+    """After plan 7 one text may be stored once per publication date. The older
+    schema forbids it, and going back must not delete documents nor fail."""
+    command.upgrade(alembic_config, "head")
+    url = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+    insert = (
+        "INSERT INTO documentos (fuente_id, identificador_externo, fecha, texto, url_fuente, hash_contenido) "
+        "VALUES (%s, %s, %s, 'texto', 'https://example.org', 'hash-mig-007')"
+    )
+    with psycopg.connect(url, autocommit=True) as conn:
+        fuente_id = conn.execute("INSERT INTO fuentes (clave, nombre) VALUES ('f', 'f') RETURNING id").fetchone()[0]
+        conn.execute(insert, (fuente_id, "a", "2026-01-01"))
+        conn.execute(insert, (fuente_id, "b", "2026-01-02"))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(insert, (fuente_id, "c", "2026-01-01"))
+
+    command.downgrade(alembic_config, "5254089ba99e")
+    with psycopg.connect(url, autocommit=True) as conn:
+        rows = conn.execute("SELECT identificador_externo, hash_contenido FROM documentos ORDER BY 1").fetchall()
+        assert [r[0] for r in rows] == ["a", "b"]
+        assert rows[0][1] == "hash-mig-007" and rows[1][1] != "hash-mig-007"
     command.upgrade(alembic_config, "head")

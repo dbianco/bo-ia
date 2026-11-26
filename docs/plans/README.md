@@ -66,7 +66,16 @@ All must pass, from `backend/`:
 - `.venv/bin/pytest -m "not docker and not live"`, which includes the tests that load the real model.
 - `.venv/bin/pytest -m docker`, for any plan that changes dependencies, migrations, startup, the API or the web interface. It stops a running development stack when it ends.
 - The plan's own tests. There is at least one test for each item under its **Success criteria**, and the pull request lists which test covers which item.
-- The plan's benchmark, where a criterion is a measurement. Plan 1 creates the benchmark command and records here how to run it. No such command exists today.
+- The plan's benchmark, where a criterion is a measurement.
+
+The benchmark command of plan 1, from `backend/`. It needs no database, no network and no model:
+
+```bash
+.venv/bin/python -m src.benchmark generate --profile gazette --seed 42 --documents 2000 --out benchmark-output/corpus
+.venv/bin/python -m src.benchmark run      --profile gazette --seed 42 --documents 2000 --out benchmark-output/run
+```
+
+`generate` writes the documents, the truth file and the synonym table. `run` writes `report.txt` and `report.json`, which are identical between runs with the same arguments, and `timings.json`, which is not. To measure the PostgreSQL implementation, add `--systems` with any of `postgres-semantic`, `postgres-hybrid`, `postgres-all` and `postgres-match`, and `--database-url` with the server to use. They run in a database of their own, created and dropped by the command. `--provider model` uses the real model, and `precompute` saves its vectors to replay them offline with `--provider precomputed`.
 
 For every plan that adds a database migration, `tests/test_migrations.py` is updated so that the new downgrade is exercised.
 

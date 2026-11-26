@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import Protocol
+from datetime import date
+from typing import Protocol, runtime_checkable
 
 from src.ingestor.contract import DocumentoNormalizado
 
@@ -25,3 +26,12 @@ class Conector(Protocol):
     def descubrir(
         self, *, fuente_clave: str, config: dict
     ) -> Iterable[DocumentoNormalizado | ErrorDescubrimiento] | Iterator[DocumentoNormalizado | ErrorDescubrimiento]: ...
+
+
+@runtime_checkable
+class Resegmenter(Protocol):
+    """A connector that can split documents stored before it produced notices."""
+
+    def resegment(
+        self, *, fuente_clave: str, identifier: str, issue_date: date, text: str, url: str, refetch_config: dict | None
+    ) -> list[DocumentoNormalizado] | None: ...

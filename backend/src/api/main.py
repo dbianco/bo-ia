@@ -12,10 +12,12 @@ from src.api.deps import get_embedder, get_installation_config
 from src.api.feedback import router as feedback_router
 from src.api.fuentes import router as fuentes_router
 from src.api.ingest import router as ingest_router
+from src.api.issues import router as issues_router
 from src.api.notificaciones import router as notificaciones_router
 from src.api.search import router as search_router
 from src.api.suscripciones import router as suscripciones_router
-from src.config.installation import upsert_fuentes
+from src.config.installation import unfillable_filters, upsert_fuentes
+from src.connectors.registry import METADATA_KEYS
 from src.scheduler import detener_scheduler, iniciar_scheduler
 from src.seed.seed import sembrar_si_vacio
 
@@ -27,6 +29,11 @@ async def lifespan(app: FastAPI):
     # FR-007: una configuración de instalación inválida no debe permitir
     # que el servicio arranque con configuración parcial.
     installation = get_installation_config()
+    for clave in unfillable_filters(installation, METADATA_KEYS):
+        logger.warning(
+            "Config: no configured source can fill the filter '%s'; it will only find documents posted with that value",
+            clave,
+        )
     session_local = sessionmaker(bind=deps._engine())
     session = session_local()
     try:
@@ -54,6 +61,7 @@ app.include_router(fuentes_router)
 app.include_router(auth_router)
 app.include_router(suscripciones_router)
 app.include_router(notificaciones_router)
+app.include_router(issues_router)
 
 
 @app.get("/health")

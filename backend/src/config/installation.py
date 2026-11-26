@@ -5,6 +5,7 @@ renombrar un filtro no debe requerir tocar el motor.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -50,6 +51,9 @@ class ConectorConfig(BaseModel):
 class FuenteConfig(BaseModel):
     clave: str
     nombre: str
+    # Values that are the same for every document of the source, such as the
+    # province. They are added to each document, so its filters find it.
+    metadata: dict[str, str | int | float] = Field(default_factory=dict)
     conector: ConectorConfig | None = None
 
 
@@ -85,10 +89,25 @@ def upsert_fuentes(session: Session, config: InstallationConfig) -> int:
     creadas = 0
     for declarada in config.fuentes:
         existente = session.scalar(select(Fuente).where(Fuente.clave == declarada.clave))
+        fijos = {"metadata": declarada.metadata} if declarada.metadata else {}
         if existente is None:
-            session.add(Fuente(clave=declarada.clave, nombre=declarada.nombre, config={}))
+            session.add(Fuente(clave=declarada.clave, nombre=declarada.nombre, config=fijos))
             creadas += 1
-        elif existente.nombre != declarada.nombre:
+            continue
+        if existente.nombre != declarada.nombre:
             existente.nombre = declarada.nombre
+        existente.config = {k: v for k, v in (existente.config or {}).items() if k != "metadata"} | fijos
     session.commit()
     return creadas
+
+
+def unfillable_filters(config: InstallationConfig, connector_keys: Mapping[str, frozenset[str]]) -> list[str]:
+    """Declared filters that no configured source can fill: searching by one of
+    them excludes every document that is collected. `connector_keys` are the
+    metadata keys each type of connector may write."""
+    fillable: set[str] = set()
+    for fuente in config.fuentes:
+        fillable.update(fuente.metadata)
+        if fuente.conector is not None:
+            fillable.update(connector_keys.get(fuente.conector.tipo, frozenset()))
+    return [f.clave for f in config.filtros if f.clave not in fillable]

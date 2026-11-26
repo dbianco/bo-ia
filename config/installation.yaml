@@ -8,6 +8,10 @@ nombre: Boletines Córdoba
 fuentes:
   - clave: cordoba-provincial
     nombre: Boletín Oficial de la Provincia de Córdoba
+    # Fixed values, added to every document of the source. `municipio` is not
+    # one of them: the connector reads it from each municipal notice.
+    metadata:
+      provincia: Córdoba
     # Etapa 2 apuntaba por error a bop.dipucordoba.es (Diputación de
     # Córdoba, ESPAÑA); corregido en la Etapa 5 al sitio real de Córdoba,
     # Argentina. Sin `fecha` en config, usa la fecha de hoy en cada
@@ -21,8 +25,14 @@ fuentes:
         secciones: [1, 2, 3, 4, 5]
   - clave: carlos-paz-municipal
     nombre: Boletín Municipal de Carlos Paz
+    metadata:
+      provincia: Córdoba
+      municipio: Carlos Paz
   - clave: noetinger-municipal
     nombre: Boletín Municipal de Noetinger
+    metadata:
+      provincia: Córdoba
+      municipio: Noetinger
 
 filtros:
   - clave: provincia

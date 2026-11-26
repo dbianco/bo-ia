@@ -15,7 +15,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.db.models import EntregaNotificacion, EvaluacionMatch
+from src.db.models import Documento, EntregaNotificacion, EvaluacionMatch
 from src.notifications.email import EnvioCorreoFallido, enviar_correo
 
 logger = logging.getLogger("contextcrawl.notifications")
@@ -27,12 +27,25 @@ def _ahora() -> datetime.datetime:
     return datetime.datetime.now(datetime.UTC)
 
 
+def _citation(documento: Documento) -> str:
+    """The line that says where in its publication the document is, if known."""
+    parts = []
+    if documento.notice_number:
+        parts.append(f"Aviso Nº {documento.notice_number}")
+    if documento.first_page and documento.first_page == documento.last_page:
+        parts.append(f"Página {documento.first_page}")
+    elif documento.first_page:
+        parts.append(f"Páginas {documento.first_page} a {documento.last_page}")
+    return " — ".join(parts) + "\n" if parts else ""
+
+
 def _cuerpo_correo(match: EvaluacionMatch) -> str:
     documento = match.documento
     return (
         f"Hay un documento nuevo que coincide con tu suscripción "
         f"'{match.suscripcion.texto_busqueda}':\n\n"
         f"{documento.titulo or documento.identificador_externo}\n"
+        f"{_citation(documento)}"
         f"{documento.url_fuente}\n"
     )
 

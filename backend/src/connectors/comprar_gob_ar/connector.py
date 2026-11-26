@@ -21,6 +21,7 @@ from src.connectors.protocol import ErrorDescubrimiento
 from src.ingestor.contract import DocumentoNormalizado
 
 VERSION = "comprar-gob-ar-csv-v1"
+METADATA_KEYS = frozenset({"organismo", "jurisdiccion", "monto"})
 
 TIMEOUT_DEFAULT = 60
 USER_AGENT = "contextcrawl-connector/1.0"

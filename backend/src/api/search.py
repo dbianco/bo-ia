@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from src.api.deps import get_embedder, get_installation_config, get_session
 from src.config.installation import InstallationConfig
-from src.db.models import Documento, Fragmento
+from src.db.models import SUPERSEDED, Documento, Fragmento
 from src.processor.embeddings import EmbeddingProvider
 from src.processor.hybrid import fusionar_rrf
 from src.processor.threshold import filtrar_por_umbral, umbral_configurado
@@ -53,6 +53,15 @@ class ResultadoBusqueda:
     url_fuente: str
     similitud: float
     coincidencia_texto: bool = field(default=False)
+    titulo: str | None = None
+    # Citation. `segmented` is None for a source whose documents are not parts
+    # of an issue, and False for text of an issue that is in no notice.
+    notice_number: str | None = None
+    issue: str | None = None
+    segmented: bool | None = None
+    page: int | None = None  # of the fragment
+    first_page: int | None = None  # of the document
+    last_page: int | None = None
 
 
 def _query_base(
@@ -61,7 +70,11 @@ def _query_base(
     filtros_solicitados: dict[str, str],
     filtros_declarados: list,
 ):
-    stmt = select(Fragmento, Documento).join(Documento, Fragmento.documento_id == Documento.id)
+    stmt = (
+        select(Fragmento, Documento)
+        .join(Documento, Fragmento.documento_id == Documento.id)
+        .where(Documento.estado != SUPERSEDED)
+    )
     if fecha_desde is not None:
         stmt = stmt.where(Fragmento.fecha >= fecha_desde)
     if fecha_hasta is not None:
@@ -128,6 +141,13 @@ def _resultado_desde(
         url_fuente=documento.url_fuente,
         similitud=round(similitud, 4),
         coincidencia_texto=coincidencia_texto,
+        titulo=documento.titulo,
+        notice_number=documento.notice_number,
+        issue=documento.issue,
+        segmented=None if documento.issue is None else documento.notice_number is not None,
+        page=fragmento.page,
+        first_page=documento.first_page,
+        last_page=documento.last_page,
     )
 
 
@@ -232,6 +252,13 @@ def buscar_endpoint(
                 "url_fuente": r.url_fuente,
                 "similitud": r.similitud,
                 "coincidencia_texto": r.coincidencia_texto,
+                "titulo": r.titulo,
+                "notice_number": r.notice_number,
+                "issue": r.issue,
+                "segmented": r.segmented,
+                "page": r.page,
+                "first_page": r.first_page,
+                "last_page": r.last_page,
             }
             for r in resultados
         ],

@@ -15,23 +15,29 @@ SOLAPAMIENTO_DEFAULT = 200
 def fragmentar_texto(
     texto: str, *, tamano: int = TAMANO_DEFAULT, solapamiento: int = SOLAPAMIENTO_DEFAULT
 ) -> list[str]:
+    return [texto[a:b] for a, b in fragment_spans(texto, tamano=tamano, solapamiento=solapamiento)]
+
+
+def fragment_spans(
+    texto: str, *, tamano: int = TAMANO_DEFAULT, solapamiento: int = SOLAPAMIENTO_DEFAULT
+) -> list[tuple[int, int]]:
+    """Start and end of each fragment in the text as it was received."""
     if tamano <= 0:
         raise ValueError("El tamaño del fragmento debe ser mayor a 0")
     if solapamiento < 0 or solapamiento >= tamano:
         raise ValueError("El solapamiento debe ser >= 0 y menor al tamaño del fragmento")
 
-    texto = texto.strip()
-    if not texto:
+    if not texto.strip():
         raise ValueError("No se puede fragmentar un texto vacío")
 
-    fragmentos: list[str] = []
-    inicio = 0
-    n = len(texto)
+    fragmentos: list[tuple[int, int]] = []
+    inicio = len(texto) - len(texto.lstrip())
+    n = len(texto.rstrip())
     paso = tamano - solapamiento
 
     while inicio < n:
         fin = min(inicio + tamano, n)
-        fragmentos.append(texto[inicio:fin])
+        fragmentos.append((inicio, fin))
         if fin == n:
             break
         inicio += paso

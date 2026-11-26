@@ -21,6 +21,12 @@ class EntregaSalida(BaseModel):
     fecha_intento: datetime.datetime | None
     documento_id: int
     suscripcion_id: int
+    # Where to find the document.
+    titulo: str | None
+    url_fuente: str
+    notice_number: str | None
+    first_page: int | None
+    last_page: int | None
 
 
 @router.get("/v1/notificaciones", response_model=list[EntregaSalida])
@@ -42,6 +48,11 @@ def listar_notificaciones(
             fecha_intento=entrega.fecha_intento,
             documento_id=entrega.match.documento_id,
             suscripcion_id=entrega.match.suscripcion_id,
+            titulo=entrega.match.documento.titulo,
+            url_fuente=entrega.match.documento.url_fuente,
+            notice_number=entrega.match.documento.notice_number,
+            first_page=entrega.match.documento.first_page,
+            last_page=entrega.match.documento.last_page,
         )
         for entrega in entregas
     ]

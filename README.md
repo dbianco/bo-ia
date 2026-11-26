@@ -15,7 +15,8 @@ ContextCrawl started as a semantic search over the Boletín Oficial (official ga
 
 - **Collects documents on a schedule.** A connector per source fetches new publications and turns them into a common document format. The engine knows nothing about a source's HTML, PDFs or APIs.
 - **Indexes them for search by meaning.** Each document is split into fragments and embedded locally with `Qwen/Qwen3-Embedding-0.6B`, stored in PostgreSQL with pgvector. Adding documents never requires retraining a model.
-- **Searches by meaning.** Semantic search with a similarity threshold is the default; a hybrid mode fuses it with full-text search. Results can be narrowed by date and by the filters the installation declares, and every result keeps its original text and source URL.
+- **Splits gazette issues into notices.** A section of the Córdoba gazette is one PDF with many unrelated notices. Each one is a document of its own, with its notice number and pages.
+- **Searches by meaning.** Semantic search with a similarity threshold is the default; a hybrid mode fuses it with full-text search. Results can be narrowed by date and by the filters the installation declares, and every result keeps its original text and source URL, with the notice number and page where the source has them.
 - **Monitors on behalf of users.** A user saves a search as a subscription. Every new document is evaluated against the active subscriptions as it is ingested, and a match is recorded with its score.
 - **Notifies.** Each match is delivered to the user's inbox in the app and, optionally, by email.
 - **Collects feedback.** Users can rate a result with a thumbs up or down.
@@ -98,7 +99,11 @@ fuentes:
       config:
         url_template: "https://boletinoficial.cba.gov.ar/wp-content/4p96humuzp/{anio}/{mes}/{seccion}_Secc_{ddmmyy}.pdf"
         secciones: [1, 2, 3, 4, 5]
+    metadata:                        # optional: added to every document of the source
+      provincia: Córdoba
 ```
+
+`metadata` holds values that are the same for the whole source, so that the declared filters find its documents. At startup, a declared filter that no source can fill is logged as a warning. Changing it affects new documents; `python -m src.commands.resegment` adds it to the stored ones (see below).
 
 The scheduler runs **inside the same `backend` container** (it is not a separate service): on startup it schedules one job per source that has a connector, according to its `frecuencia_minutos`. Each run is recorded in `ejecuciones_fuente` (start, end, discovered, new, existing, errors). A source with no `conector` declared is still fed only by the seed or by a manual `POST /v1/documentos`, as in Etapa 1.
 
@@ -112,9 +117,22 @@ Connectors available today (`backend/src/connectors/registry.py`):
 
 | Key (`tipo`) | What it does |
 |---|---|
-| `boletin-cba-pdf-diario` | Direct HTTP (`curl`, see Etapa 5) against `boletinoficial.cba.gov.ar`: predictable PDF URL per section/date, extracts text with `pypdf`. One `DocumentoNormalizado` per (date, section). |
+| `boletin-cba-pdf-diario` | Direct HTTP (`curl`, see Etapa 5) against `boletinoficial.cba.gov.ar`: predictable PDF URL per section/date, extracts text with `pypdf` and splits it at the closing line of each notice. One `DocumentoNormalizado` per notice, with its number, pages and issue. The cover is kept but not searchable, and text without a closing line is one "unsegmented" document. |
 | `comprar-gob-ar-csv` | Streams the open dataset of national tenders (`Convocatorias.csv`, datos.gob.ar) and produces one `DocumentoNormalizado` per row, filtered by `anio_desde` (Etapa 5). |
 | `bop-cordoba-scrapy` | Scrapy + PDF extraction against the official gazette of the Diputación de Córdoba, **Spain** (`bop.dipucordoba.es`) — the reference connector from Etapa 2, unused by any installation since Etapa 5 (it pointed at the wrong site by mistake; see `docs/specs/etapa-5-segundo-vertical/`). It stays registered and tested, so already-proven code is not deleted. |
+
+Notices that the gazette prints as an image have no text to extract: only their closing line is stored. `municipio` is read from the title of municipal notices. `organismo` and `monto` are not read from gazette notices yet ([plan 8](docs/plans/08-classification-and-field-extraction.md)), so filtering by them excludes those.
+
+#### Upgrading an installation with stored gazette sections
+
+Before the notices were split, a whole section was one document. After upgrading, split the stored ones, or the next run for the same day adds its notices next to them:
+
+```bash
+docker compose exec backend python -m src.commands.resegment --source cordoba-provincial --dry-run
+docker compose exec backend python -m src.commands.resegment --source cordoba-provincial --refetch
+```
+
+`--refetch` downloads each PDF again to know the pages, and uses the saved text when it cannot; without it the notices have no page. Choose it on the first run: a section that has been split is not split again. It raises no alerts, keeps the matches and ratings of the replaced sections, and can be run again if it is interrupted.
 
 Each connector's tests run against local fixtures; tests marked `live` (excluded by default and from CI) run against the real site/dataset.
 
@@ -123,6 +141,7 @@ Endpoints exposed by the backend (`http://localhost:9101`):
 | Method and path | What it does |
 |---|---|
 | `GET /v1/search` | Semantic search (`q`, `date_from`, `date_to`, `limit`, `mode`, `filtro.<key>` for each declared filter) |
+| `GET /v1/issues/{source}/{issue}` | The documents of one issue, together (for example `cordoba-provincial/4_Secc_240926`) |
 | `GET /v1/config` | Installation name and the filters declared in `installation.yaml` |
 | `POST /v1/documentos` | Ingests a document (validates, chunks, generates embeddings) |
 | `POST /v1/fuentes/{clave}/ejecutar` | Triggers a manual run of a source's connector |
@@ -181,6 +200,14 @@ Open `http://localhost:9102` to use the UI, or try the API directly:
 curl http://localhost:9101/health
 curl "http://localhost:9101/v1/search?q=presupuesto+provincial"
 ```
+
+### Without the model
+
+`EMBEDDING_PROVIDER=hashed` replaces the real model with offline vectors, for development on a machine without network: texts are close if they share words. `EMBEDDING_PROVIDER=precomputed` replays vectors from a file (`EMBEDDING_PRECOMPUTED`). The vectors of two providers cannot be compared, so do not change it on a database that already has documents. The hashed vectors also need a lower `SIMILARITY_THRESHOLD` than the real model.
+
+## Benchmark
+
+`python -m src.benchmark` generates a corpus with known answers and measures search and matching against it, with no database, network or model. See [how to run it](docs/plans/README.md#automated-checks) and the [first numbers](docs/plans/01-synthetic-corpus-and-benchmark.md#first-numbers).
 
 ## Running the tests
 

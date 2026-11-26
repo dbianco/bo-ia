@@ -411,6 +411,11 @@ button:focus-visible,
   margin: 0 0 0.35rem;
 }
 
+.resultado-titulo {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
 .resultado-texto {
   margin: 0 0 0.5rem;
   font-size: 0.9rem;

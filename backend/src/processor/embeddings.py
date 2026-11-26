@@ -2,6 +2,9 @@
 vía sentence-transformers (sección 6 del design spec), más un fake
 determinístico para no depender de descargar el modelo real en tests
 rápidos.
+
+The offline providers are in `hashed_embeddings.py` and
+`precomputed_embeddings.py`, and `providers.py` chooses one from settings.
 """
 from __future__ import annotations
 
@@ -44,10 +47,17 @@ class SentenceTransformerEmbeddingProvider:
     def embed_passage(self, texto: str) -> list[float]:
         return self._model.encode(texto, normalize_embeddings=True).tolist()
 
+    def describe(self) -> dict:
+        return {"provider": "model", "model": self._model_name}
+
 
 class FakeEmbeddingProvider:
     """Embeddings determinísticos y rápidos para tests: NO usa el modelo
-    real. Mismo texto -> mismo vector; nunca se usa en producción."""
+    real. Mismo texto -> mismo vector; nunca se usa en producción.
+
+    Only for tests that need arbitrary vectors: similarity between them means
+    nothing, and settings cannot select it. When a test or a benchmark depends
+    on similarity, use `HashedEmbeddingProvider`."""
 
     def __init__(self, dim: int = EMBEDDING_DIM) -> None:
         self._dim = dim

@@ -32,6 +32,10 @@ EMBEDDING_DIM = 1024  # dimensión de salida de Qwen/Qwen3-Embedding-0.6B
 ORIGENES_TAG = ("manual", "modelo", "sugerido")
 VALORES_FEEDBACK = ("positivo", "negativo")
 
+# States of a document besides "pendiente", "completo" and "error".
+NOT_SEARCHABLE = "not_searchable"  # kept for completeness, without fragments (the cover of an issue)
+SUPERSEDED = "superseded"  # replaced by the notices it contained; kept for its history
+
 
 class Base(DeclarativeBase):
     pass
@@ -108,6 +112,14 @@ class Documento(Base):
     # declarados por instalación (`aplicar_filtros`) usen el operador `@>`.
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, server_default="{}")
     version_ingesta: Mapped[str] = mapped_column(String(32), nullable=False, server_default="v1")
+    # Where to find the document in the publication it came in. `issue` is
+    # shared by everything printed in one issue (one PDF, for instance); the
+    # number is the official one within it. A document with an issue and no
+    # number is text that could not be attributed to any notice.
+    issue: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    notice_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    first_page: Mapped[int | None] = mapped_column(nullable=True)
+    last_page: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -119,7 +131,10 @@ class Documento(Base):
 
     __table_args__ = (
         UniqueConstraint("fuente_id", "identificador_externo", name="uq_documento_fuente_identificador"),
-        UniqueConstraint("hash_contenido", name="uq_documento_hash_contenido"),
+        # With the date: the same notice is published on consecutive days with
+        # identical text, and each publication is a document.
+        UniqueConstraint("hash_contenido", "fecha", name="uq_documento_hash_contenido_fecha"),
+        Index("ix_documentos_fuente_id_issue", "fuente_id", "issue"),
         Index("ix_documentos_metadata_gin", "metadata", postgresql_using="gin"),
     )
 
@@ -137,6 +152,7 @@ class Fragmento(Base):
     # filtro de fecha de la búsqueda la necesita sin tener que hacer join
     # contra documentos en cada búsqueda.
     fecha: Mapped[datetime.date] = mapped_column(nullable=False)
+    page: Mapped[int | None] = mapped_column(nullable=True)  # where the fragment starts
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
     # Búsqueda de texto completo en español (modos HYBRID/ALL). Columna

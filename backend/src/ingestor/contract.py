@@ -9,14 +9,15 @@ genera embeddings — reemplaza la lógica que antes estaba duplicada entre
 from __future__ import annotations
 
 import hashlib
+from bisect import bisect_right
 from dataclasses import dataclass, field
 from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from src.db.models import Documento, Fragmento, Fuente
-from src.ingestor.fragmenter import fragmentar_texto
+from src.db.models import NOT_SEARCHABLE, Documento, Fragmento, Fuente
+from src.ingestor.fragmenter import fragment_spans
 from src.processor.embeddings import EmbeddingProvider
 from src.subscriptions.evaluator import evaluar_documento
 
@@ -39,6 +40,15 @@ class DocumentoNormalizado:
     url_fuente: str
     titulo: str | None = None
     metadata: dict = field(default_factory=dict)
+    # Optional, for a document that is part of a larger publication: the issue
+    # it came in, its official number, and where each page starts in `texto`,
+    # as (offset, page) in ascending order.
+    issue: str | None = None
+    notice_number: str | None = None
+    page_starts: list[tuple[int, int]] = field(default_factory=list)
+    # False for text that must be kept but nobody looks for, such as a cover:
+    # it is stored without fragments and matches nothing.
+    searchable: bool = True
 
 
 @dataclass
@@ -69,6 +79,11 @@ def _hash_contenido(texto: str) -> str:
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()
 
 
+def source_metadata(fuente: Fuente) -> dict:
+    """Values that are constant for a source, declared in `installation.yaml`."""
+    return dict((fuente.config or {}).get("metadata", {}))
+
+
 def _resolver_fuente(session: Session, clave: str) -> Fuente:
     """Get-or-create por `clave`. `installation.yaml` hace upsert de las
     fuentes declaradas al arrancar (FR-008); esto cubre además cualquier
@@ -81,6 +96,13 @@ def _resolver_fuente(session: Session, clave: str) -> Fuente:
     return fuente
 
 
+def _page_at(page_starts: list[tuple[int, int]], offset: int) -> int | None:
+    if not page_starts:
+        return None
+    position = bisect_right([start for start, _ in page_starts], offset) - 1
+    return page_starts[max(position, 0)][1]
+
+
 def ingerir_documento(
     session: Session,
     embedder: EmbeddingProvider,
@@ -88,10 +110,16 @@ def ingerir_documento(
     *,
     tamano_fragmento: int = 1000,
     solapamiento_fragmento: int = 200,
+    evaluate: bool = True,
 ) -> ResultadoIngesta:
     """Persiste el documento si no existe, lo fragmenta y genera sus
     embeddings. Idempotente por (fuente, identificador_externo) y por
-    hash_contenido (FR-002).
+    hash_contenido (FR-002) en una misma fecha: the same text published on
+    another date is another document.
+
+    The fixed metadata of the source (`fuentes.config["metadata"]`) is added to
+    the document; a value of the document itself wins. With `evaluate=False` the
+    document is not matched against subscriptions: no alerts.
 
     El documento se commitea apenas se valida, antes de fragmentar: así,
     si la fragmentación o el embedding fallan, el documento ya recibido no
@@ -108,7 +136,9 @@ def ingerir_documento(
         )
     )
     if existente is None:
-        existente = session.scalar(select(Documento).where(Documento.hash_contenido == hash_contenido))
+        existente = session.scalar(
+            select(Documento).where(Documento.hash_contenido == hash_contenido, Documento.fecha == doc.fecha)
+        )
 
     if existente is not None:
         fragmentos_existentes = session.scalar(
@@ -124,21 +154,29 @@ def ingerir_documento(
         texto=doc.texto,
         url_fuente=doc.url_fuente,
         hash_contenido=hash_contenido,
-        estado="pendiente",
-        metadata_=doc.metadata,
+        estado="pendiente" if doc.searchable else NOT_SEARCHABLE,
+        metadata_={**source_metadata(fuente), **doc.metadata},
+        issue=doc.issue,
+        notice_number=doc.notice_number,
+        first_page=doc.page_starts[0][1] if doc.page_starts else None,
+        last_page=doc.page_starts[-1][1] if doc.page_starts else None,
     )
     session.add(documento)
     session.flush()
     session.commit()  # el documento ya queda persistido, independiente de lo que pase después
 
+    if not doc.searchable:
+        return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=0)
+
     try:
-        textos = fragmentar_texto(doc.texto, tamano=tamano_fragmento, solapamiento=solapamiento_fragmento)
-        if not textos:
+        spans = fragment_spans(doc.texto, tamano=tamano_fragmento, solapamiento=solapamiento_fragmento)
+        if not spans:
             # No debería pasar (fragmentar_texto garantiza >=1 para texto no
             # vacío), pero FR-007 (del MVP original) se verifica igual.
             raise RuntimeError("La fragmentación no produjo ningún fragmento")
 
-        for posicion, texto in enumerate(textos):
+        for posicion, (inicio, fin) in enumerate(spans):
+            texto = doc.texto[inicio:fin]
             embedding = embedder.embed_passage(texto)
             session.add(
                 Fragmento(
@@ -146,6 +184,7 @@ def ingerir_documento(
                     posicion=posicion,
                     texto=texto,
                     fecha=documento.fecha,
+                    page=_page_at(doc.page_starts, inicio),
                     embedding=embedding,
                 )
             )
@@ -162,6 +201,7 @@ def ingerir_documento(
     # FR-012: solo para un documento genuinamente nuevo y ya completo. Fuera
     # del try/except de arriba a propósito: un error acá no debe revertir un
     # documento que ya se ingirió bien a estado="error".
-    evaluar_documento(session, documento)
+    if evaluate:
+        evaluar_documento(session, documento)
 
-    return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=len(textos))
+    return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=len(spans))

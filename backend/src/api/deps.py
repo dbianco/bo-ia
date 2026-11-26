@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.auth.sessions import obtener_usuario_de_sesion
 from src.config.installation import InstallationConfig, cargar_installation_config
 from src.db.models import Usuario
-from src.processor.embeddings import EmbeddingProvider, SentenceTransformerEmbeddingProvider
+from src.processor.embeddings import EmbeddingProvider
+from src.processor.providers import provider_from_environment
 
 COOKIE_SESION = "contextcrawl_sesion"
 
@@ -39,7 +40,7 @@ def get_session() -> Iterator[Session]:
 
 @lru_cache
 def _embedder() -> EmbeddingProvider:
-    return SentenceTransformerEmbeddingProvider()
+    return provider_from_environment()
 
 
 def get_embedder() -> EmbeddingProvider:
