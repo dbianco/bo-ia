@@ -88,7 +88,7 @@ def test_error_de_descubrimiento_no_pierde_el_resto_de_la_ejecucion(
         db_session, FakeEmbeddingProvider(), fuente, conector, {}, version_conector="fake-v1"
     )
 
-    assert ejecucion.estado == "completada"
+    assert ejecucion.estado == "partial"  # plan 15: it was "completada"
     assert ejecucion.descubiertos == 3
     assert ejecucion.nuevos == 2
     assert ejecucion.errores == 1

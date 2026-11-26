@@ -9,6 +9,7 @@ genera embeddings — reemplaza la lógica que antes estaba duplicada entre
 from __future__ import annotations
 
 import hashlib
+import logging
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from datetime import date
@@ -17,9 +18,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.db.models import NOT_SEARCHABLE, Documento, Fragmento, Fuente
+from src.ingestor.changes import differences
 from src.ingestor.fragmenter import fragment_spans
 from src.matching.queue import enqueue
 from src.processor.embeddings import EmbeddingProvider
+
+logger = logging.getLogger("contextcrawl.ingest")
 
 
 class DocumentoInvalido(ValueError):
@@ -56,6 +60,8 @@ class ResultadoIngesta:
     documento: Documento
     ya_existia: bool
     fragmentos_creados: int
+    retried: bool = False  # it had failed before, and is complete now
+    changed: bool = False  # it was stored with other content, which is kept
 
 
 def _validar(doc: DocumentoNormalizado) -> None:
@@ -123,7 +129,8 @@ def ingerir_documento(
 
     El documento se commitea apenas se valida, antes de fragmentar: así,
     si la fragmentación o el embedding fallan, el documento ya recibido no
-    se pierde (FR-003, FR-006) — solo queda marcado con estado="error".
+    se pierde (FR-003, FR-006) — solo queda marcado con estado="error", and is
+    processed again, from what was stored, when it arrives again.
     """
     _validar(doc)
     fuente = _resolver_fuente(session, doc.fuente_clave)
@@ -141,10 +148,25 @@ def ingerir_documento(
         )
 
     if existente is not None:
+        mismo_registro = (
+            existente.fuente_id == fuente.id and existente.identificador_externo == doc.identificador_externo
+        )
+        changed = mismo_registro and _compare(session, existente, doc, source_metadata(fuente))
+        if existente.estado == "error" and _claim_retry(session, existente):
+            # The stored row is what is processed. Its pages are known if the text is the same one.
+            paginas = doc.page_starts if existente.hash_contenido == hash_contenido else []
+            creados = _process(
+                session, embedder, existente, paginas, tamano_fragmento, solapamiento_fragmento, evaluate
+            )
+            return ResultadoIngesta(
+                documento=existente, ya_existia=False, fragmentos_creados=creados, retried=True, changed=changed
+            )
         fragmentos_existentes = session.scalar(
             select(func.count()).select_from(Fragmento).where(Fragmento.documento_id == existente.id)
         )
-        return ResultadoIngesta(documento=existente, ya_existia=True, fragmentos_creados=fragmentos_existentes)
+        return ResultadoIngesta(
+            documento=existente, ya_existia=True, fragmentos_creados=fragmentos_existentes, changed=changed
+        )
 
     documento = Documento(
         fuente_id=fuente.id,
@@ -168,15 +190,63 @@ def ingerir_documento(
     if not doc.searchable:
         return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=0)
 
+    creados = _process(
+        session, embedder, documento, doc.page_starts, tamano_fragmento, solapamiento_fragmento, evaluate
+    )
+    return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=creados)
+
+
+def _compare(session: Session, stored: Documento, doc: DocumentoNormalizado, fixed: dict) -> bool:
+    """Whether a record came again with other content. It is not overwritten, only
+    reported; metadata keys it did not have are added."""
+    metadata = stored.metadata_ or {}
+    incoming = {**fixed, **doc.metadata}
+    changed = differences(stored.texto, metadata, doc.texto, incoming)
+    if changed:
+        logger.warning(
+            "The record %s of the source %s came with changes, which are not stored: %s",
+            doc.identificador_externo,
+            doc.fuente_clave,
+            ", ".join(changed),
+        )
+    if incoming.keys() - metadata.keys():
+        stored.metadata_ = {**incoming, **metadata}
+        session.commit()
+    return bool(changed)
+
+
+def _claim_retry(session: Session, document: Documento) -> bool:
+    """Locks a failed document to process it again. False if somebody else just did."""
+    state = session.scalar(
+        select(Documento.estado)
+        .where(Documento.id == document.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    session.refresh(document)
+    return state == "error"
+
+
+def _process(
+    session: Session,
+    embedder: EmbeddingProvider,
+    documento: Documento,
+    page_starts: list[tuple[int, int]],
+    tamano_fragmento: int,
+    solapamiento_fragmento: int,
+    evaluate: bool,
+) -> int:
+    """Fragments and embeds a stored document, and leaves it complete and queued
+    to be matched, all in one transaction. If it fails, in "error"."""
     try:
-        spans = fragment_spans(doc.texto, tamano=tamano_fragmento, solapamiento=solapamiento_fragmento)
+        spans = fragment_spans(documento.texto, tamano=tamano_fragmento, solapamiento=solapamiento_fragmento)
         if not spans:
             # No debería pasar (fragmentar_texto garantiza >=1 para texto no
             # vacío), pero FR-007 (del MVP original) se verifica igual.
             raise RuntimeError("La fragmentación no produjo ningún fragmento")
 
         for posicion, (inicio, fin) in enumerate(spans):
-            texto = doc.texto[inicio:fin]
+            texto = documento.texto[inicio:fin]
             embedding = embedder.embed_passage(texto)
             session.add(
                 Fragmento(
@@ -184,7 +254,7 @@ def ingerir_documento(
                     posicion=posicion,
                     texto=texto,
                     fecha=documento.fecha,
-                    page=_page_at(doc.page_starts, inicio),
+                    page=_page_at(page_starts, inicio),
                     embedding=embedding,
                 )
             )
@@ -201,5 +271,4 @@ def ingerir_documento(
         raise ErrorDeProcesamiento(
             "Error al fragmentar o generar embeddings; el documento quedó registrado con estado 'error'."
         ) from exc
-
-    return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=len(spans))
+    return len(spans)

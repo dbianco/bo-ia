@@ -65,8 +65,9 @@ def test_each_revision_downgrades_one_step_cleanly(alembic_config: Config) -> No
     # generalización a documentos/fuentes (Etapa 1), ejecuciones_fuente
     # (Etapa 2), usuarios/suscripciones (Etapa 3), entregas_notificacion
     # (Etapa 4), notice segmentation (plan 7),
-    # asynchronous matching (plan 3), change tracking of documents (plan 4).
-    for _ in range(12):
+    # asynchronous matching (plan 3), change tracking of documents (plan 4),
+    # run states and changed count (plan 15).
+    for _ in range(13):
         command.downgrade(alembic_config, "-1")
     command.upgrade(alembic_config, "head")
 
@@ -143,4 +144,24 @@ def test_notice_segmentation_downgrade_keeps_every_document(alembic_config: Conf
         rows = conn.execute("SELECT identificador_externo, hash_contenido FROM documentos ORDER BY 1").fetchall()
         assert [r[0] for r in rows] == ["a", "b"]
         assert rows[0][1] == "hash-mig-007" and rows[1][1] != "hash-mig-007"
+    command.upgrade(alembic_config, "head")
+
+
+def test_run_states_downgrade_keeps_the_runs(alembic_config: Config) -> None:
+    """The older schema does not know the partial state."""
+    command.upgrade(alembic_config, "head")
+    url = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+    insert = (
+        "INSERT INTO ejecuciones_fuente (fuente_id, inicio, estado, version_conector) VALUES (%s, now(), %s, 'v') "
+    )
+    with psycopg.connect(url, autocommit=True) as conn:
+        fuente_id = conn.execute("INSERT INTO fuentes (clave, nombre) VALUES ('f', 'f') RETURNING id").fetchone()[0]
+        conn.execute(insert, (fuente_id, "partial"))
+        conn.execute(insert, (fuente_id, "fallida"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute(insert, (fuente_id, "anything"))
+    command.downgrade(alembic_config, "e5a94f7b3d12")
+    with psycopg.connect(url, autocommit=True) as conn:
+        states = conn.execute("SELECT estado FROM ejecuciones_fuente ORDER BY id").fetchall()
+        assert states == [("completada",), ("fallida",)]
     command.upgrade(alembic_config, "head")

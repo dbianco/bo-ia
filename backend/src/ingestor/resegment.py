@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from src.config.installation import fill_fixed_metadata
 from src.connectors.protocol import Resegmenter
 from src.db.models import SUPERSEDED, Documento, Fragmento, Fuente
 from src.ingestor.contract import (
     DocumentoNormalizado,
     ErrorDeProcesamiento,
     ingerir_documento,
-    source_metadata,
 )
 from src.processor.embeddings import EmbeddingProvider
 
@@ -77,16 +77,12 @@ def resegment_source(
 
 
 def _fill_metadata(session: Session, fuente: Fuente, summary: ResegmentSummary, dry_run: bool) -> None:
-    fixed = source_metadata(fuente)
-    if not fixed:
-        return
-    for document in session.scalars(select(Documento).where(Documento.fuente_id == fuente.id)):
-        complete = {**fixed, **(document.metadata_ or {})}
-        if complete != document.metadata_:
-            summary.metadata_filled += 1
-            if not dry_run:
-                document.metadata_ = complete
-    session.commit()
+    summary.metadata_filled = fill_fixed_metadata(session, fuente)
+    if dry_run:
+        session.rollback()
+    else:
+        session.commit()
+        session.expire_all()
 
 
 def _split(
@@ -119,21 +115,8 @@ def _ingest_all(
         try:
             result = ingerir_documento(session, embedder, document, evaluate=False)
         except ErrorDeProcesamiento as exc:
+            # It is stored as failed, and processed again in the next run.
             logger.warning("%s: %s", document.identificador_externo, exc)
-            # A document in "error" counts as ingested and would never be tried
-            # again. This one can be rebuilt from the section at any time.
-            failed = session.scalar(
-                select(Documento)
-                .join(Fuente, Documento.fuente_id == Fuente.id)
-                .where(
-                    Fuente.clave == document.fuente_clave,
-                    Documento.identificador_externo == document.identificador_externo,
-                    Documento.estado == "error",
-                )
-            )
-            if failed is not None:
-                session.delete(failed)
-                session.commit()
             return False
         if document.notice_number and not result.ya_existia:
             summary.notices += 1

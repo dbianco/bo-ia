@@ -11,10 +11,11 @@ from typing import Annotated, Literal
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import literal, not_, select, update
+from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import Session
 
-from src.db.models import Fuente
+from src.db.models import Documento, Fuente
 
 
 class InstallationConfigInvalida(ValueError):
@@ -82,10 +83,28 @@ def cargar_installation_config(ruta: str | Path) -> InstallationConfig:
         raise InstallationConfigInvalida(f"Configuración de instalación inválida ({path}): {exc}") from exc
 
 
+def fill_fixed_metadata(session: Session, fuente: Fuente) -> int:
+    """Adds the fixed metadata of a source to its documents that do not have it.
+    A value that a document has is kept. Returns how many documents changed."""
+    fixed = (fuente.config or {}).get("metadata", {})
+    if not fixed:
+        return 0
+    result = session.execute(
+        update(Documento)
+        .where(Documento.fuente_id == fuente.id, not_(Documento.metadata_.has_all(array(list(fixed)))))
+        .values(metadata_=literal(fixed, type_=JSONB).op("||")(Documento.metadata_))
+        .execution_options(synchronize_session=False)
+    )
+    return result.rowcount
+
+
 def upsert_fuentes(session: Session, config: InstallationConfig) -> int:
     """Crea o actualiza las fuentes declaradas por la instalación,
     idempotente por `clave` (FR-008). Devuelve la cantidad de fuentes
-    nuevas creadas."""
+    nuevas creadas.
+
+    The fixed metadata of a source is also added to the documents it already
+    has, so that the filters find them."""
     creadas = 0
     for declarada in config.fuentes:
         existente = session.scalar(select(Fuente).where(Fuente.clave == declarada.clave))
@@ -97,6 +116,7 @@ def upsert_fuentes(session: Session, config: InstallationConfig) -> int:
         if existente.nombre != declarada.nombre:
             existente.nombre = declarada.nombre
         existente.config = {k: v for k, v in (existente.config or {}).items() if k != "metadata"} | fijos
+        fill_fixed_metadata(session, existente)
     session.commit()
     return creadas
 

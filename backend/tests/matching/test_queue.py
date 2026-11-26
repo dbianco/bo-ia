@@ -208,10 +208,9 @@ def test_a_reported_match_is_checked_against_the_filter(db_session: Session, sub
 def test_a_slow_mail_server_does_not_slow_ingestion(db_session: Session, matcher, subscribe, ingest, monkeypatch) -> None:
     subscribe(canales=["correo"])
     sent = []
-    monkeypatch.setattr(dispatcher, "enviar_correo", lambda **mail: (time.sleep(0.5), sent.append(mail)))
-    start = time.perf_counter()
+    monkeypatch.setattr(dispatcher, "enviar_correo", lambda **mail: sent.append(mail))
     ingest()
-    assert time.perf_counter() - start < 0.4 and sent == []
+    assert sent == [], "ingestion does not send email, so it cannot wait for it"
     process_queue(db_session, matcher)
     assert len(sent) == 1
 

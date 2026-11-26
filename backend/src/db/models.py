@@ -70,7 +70,9 @@ class Fuente(Base):
     ejecuciones: Mapped[list[EjecucionFuente]] = relationship(back_populates="fuente")
 
 
-ESTADOS_EJECUCION = ("en_curso", "completada", "fallida")
+# "partial": some items failed and others did not.
+ESTADOS_EJECUCION = ("en_curso", "completada", "partial", "fallida")
+SUCCESSFUL_RUNS = ("completada", "partial")
 
 
 class EjecucionFuente(Base):
@@ -88,6 +90,8 @@ class EjecucionFuente(Base):
     descubiertos: Mapped[int] = mapped_column(nullable=False, server_default="0")
     nuevos: Mapped[int] = mapped_column(nullable=False, server_default="0")
     existentes: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    # Of the ones that were already there, how many came with other content.
+    changed: Mapped[int] = mapped_column(nullable=False, server_default="0")
     errores: Mapped[int] = mapped_column(nullable=False, server_default="0")
     version_conector: Mapped[str] = mapped_column(String(64), nullable=False)
     # Lista de {"identificador_externo": str | None, "error": str}, una por

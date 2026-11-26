@@ -35,7 +35,9 @@ def ejecutar_conector(
     individual (de descubrimiento o de ingesta) se cuenta como error de la
     ejecución sin perder el resto (FR-003); un error del conector completo
     (p. ej. no se pudo conectar) marca toda la ejecución como `fallida`,
-    pero igual queda registrada con lo que se llegó a procesar.
+    pero igual queda registrada con lo que se llegó a procesar. A run in
+    which every item failed is `fallida` too, and one in which only some did
+    is `partial`.
     """
     ejecucion = EjecucionFuente(
         fuente_id=fuente.id,
@@ -47,7 +49,7 @@ def ejecutar_conector(
     session.flush()
     session.commit()
 
-    descubiertos = nuevos = existentes = errores = 0
+    descubiertos = nuevos = existentes = changed = errores = 0
     detalle_errores: list[dict] = []
     estado_final = "completada"
 
@@ -62,6 +64,7 @@ def ejecutar_conector(
 
             try:
                 resultado = ingerir_documento(session, embedder, item)
+                changed += resultado.changed
                 if resultado.ya_existia:
                     existentes += 1
                 else:
@@ -80,11 +83,15 @@ def ejecutar_conector(
         detalle_errores.append({"identificador_externo": None, "error": str(exc)})
         logger.error("La ejecución de la fuente %s falló: %s", fuente.clave, exc)
 
+    if estado_final == "completada" and errores:
+        estado_final = "partial" if nuevos + existentes else "fallida"
+
     ejecucion.fin = _ahora()
     ejecucion.estado = estado_final
     ejecucion.descubiertos = descubiertos
     ejecucion.nuevos = nuevos
     ejecucion.existentes = existentes
+    ejecucion.changed = changed
     ejecucion.errores = errores
     ejecucion.detalle_errores = detalle_errores
     session.commit()

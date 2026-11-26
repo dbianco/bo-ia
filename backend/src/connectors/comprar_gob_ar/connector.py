@@ -12,16 +12,17 @@ from __future__ import annotations
 
 import csv
 import logging
+import re
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, datetime
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from src.connectors.protocol import ErrorDescubrimiento
 from src.ingestor.contract import DocumentoNormalizado
 
-VERSION = "comprar-gob-ar-csv-v1"
-METADATA_KEYS = frozenset({"organismo", "jurisdiccion", "monto"})
+VERSION = "comprar-gob-ar-csv-v2"
+METADATA_KEYS = frozenset({"organismo", "jurisdiccion", "monto", "opening_date"})
 
 TIMEOUT_DEFAULT = 60
 USER_AGENT = "contextcrawl-connector/1.0"
@@ -39,6 +40,36 @@ def _parsear_fecha(valor: str) -> date:
     parte_fecha = valor.split(" ", 1)[0]
     dia, mes, anio = parte_fecha.split("/")
     return date(int(anio), int(mes), int(dia))
+
+
+_OPENING = re.compile(
+    r"(?P<day>\d{1,2})/(?P<month>\d{1,2})/(?P<year>\d{4})"
+    r"(?:\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?(?:\s*(?P<half>[ap])\.?\s*m\.?)?)?",
+    re.IGNORECASE,
+)
+
+
+def parse_opening(value: str | None) -> str | None:
+    """The opening date of a tender as ISO 8601, with the time if it has one (in
+    local time, which is how it is published). None if it cannot be read: the
+    tender is ingested all the same."""
+    match = _OPENING.fullmatch((value or "").strip())
+    if match is None:
+        return None
+    try:
+        day = date(int(match["year"]), int(match["month"]), int(match["day"]))
+        if match["hour"] is None:
+            return day.isoformat()
+        hour = int(match["hour"])
+        if match["half"]:
+            if not 1 <= hour <= 12:
+                return None
+            hour = hour % 12 + (12 if match["half"].lower() == "p" else 0)
+        return datetime(
+            day.year, day.month, day.day, hour, int(match["minute"]), int(match["second"] or 0)
+        ).isoformat()
+    except ValueError:
+        return None
 
 
 def _parsear_monto(valor: str) -> float | None:
@@ -59,6 +90,10 @@ def _fila_a_documento(fuente_clave: str, fila: dict) -> DocumentoNormalizado:
     monto = _parsear_monto(fila["Monto_Estimado"])
     if monto is not None:
         metadata["monto"] = monto
+
+    opening = parse_opening(fila.get("Fecha_de_Apertura"))
+    if opening is not None:
+        metadata["opening_date"] = opening
 
     titulo = fila["Nombre_del_Proceso"]
     objeto = fila["Objeto_del_Proceso"]

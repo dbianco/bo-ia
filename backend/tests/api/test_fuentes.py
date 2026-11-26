@@ -44,6 +44,7 @@ def client(db_session: Session, installation: InstallationConfig, monkeypatch):
 
     monkeypatch.setitem(fuentes_module.CONECTORES, "fake", _ConectorFake)
     monkeypatch.setitem(fuentes_module.VERSIONES, "fake", "fake-v1")
+    monkeypatch.setenv("OPERATOR_TOKEN", "token-de-prueba")
 
     def _get_session_override():
         yield db_session
@@ -51,7 +52,7 @@ def client(db_session: Session, installation: InstallationConfig, monkeypatch):
     app.dependency_overrides[get_session] = _get_session_override
     app.dependency_overrides[get_embedder] = lambda: FakeEmbeddingProvider()
     app.dependency_overrides[get_installation_config] = lambda: installation
-    yield TestClient(app)
+    yield TestClient(app, headers={"Authorization": "Bearer token-de-prueba"})
     app.dependency_overrides.clear()
 
 

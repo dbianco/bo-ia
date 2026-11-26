@@ -1,6 +1,7 @@
 """Endpoint de ingesta genérico: POST /v1/documentos (FR-001 a FR-003,
 FR-006). Capa fina sobre `ingerir_documento` (`src/ingestor/contract.py`),
 que hace todo el trabajo de persistencia, fragmentación y embeddings.
+Only the operator may call it (`src/auth/operator.py`).
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.api.deps import get_embedder, get_session
+from src.auth.operator import require_operator
 from src.ingestor.contract import (
     DocumentoInvalido,
     DocumentoNormalizado,
@@ -39,9 +41,13 @@ class DocumentoSalida(BaseModel):
     ya_existia: bool
     estado: str
     fragmentos_creados: int
+    retried: bool  # it had failed before, and was processed again
+    changed: bool  # it was stored with other content, which is kept
 
 
-@router.post("/v1/documentos", status_code=201, response_model=DocumentoSalida)
+@router.post(
+    "/v1/documentos", status_code=201, response_model=DocumentoSalida, dependencies=[Depends(require_operator)]
+)
 def ingerir_endpoint(
     entrada: DocumentoEntrada,
     session: Session = Depends(get_session),
@@ -74,4 +80,6 @@ def ingerir_endpoint(
         ya_existia=resultado.ya_existia,
         estado=resultado.documento.estado,
         fragmentos_creados=resultado.fragmentos_creados,
+        retried=resultado.retried,
+        changed=resultado.changed,
     )

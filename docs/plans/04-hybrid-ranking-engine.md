@@ -71,14 +71,14 @@ Measured on the synthetic corpus from plan 1 at a proposed scale of 1,000,000 fr
 
 ## Status
 
-Implemented. Not marked as done yet: one criterion is not met at full scale (see Quality), and `pytest -m slow` and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+Implemented. One criterion is not met at full scale, and the owner accepted the result as it is (see Quality). Not marked as done yet: `pytest -m slow` and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
 
 | Criterion | Result | Test |
 |---|---|---|
 | Pruned top 10 equals the exhaustive one | Met: 0 differences in 400 searches (200 queries, any word and every word), scoring 0.4% of the postings | `tests/engine/test_lexical.py::test_the_pruned_top_equals_the_exhaustive_one`, `tests/benchmark/test_scale_search.py::test_pruned_lexical_results_equal_the_exhaustive_ones` |
 | Recall@10 of at least 0.95, also under filters that keep 1% | Met with the default width of 128: 0.973 without filters, 0.976 keeping 30%, 0.991 keeping 10%, 1.000 keeping 1% (scanned) | `tests/vector/test_hnsw.py::test_recall_under_filters`, `tests/benchmark/test_scale_search.py::test_recall_with_and_without_filters` |
 | Hybrid p95 below PostgreSQL, proposed under 50 ms | Met: 26.5 ms in the engine. With reading the 10 rows of the result (15.7 ms) some 42 ms, against 102 ms for PostgreSQL | `python -m src.benchmark scale-search`, with and without `--database-url` |
-| Hybrid nDCG@10 not below the better of its parts on paraphrases | Met at 1,200 and 20,000 documents (equal to semantic). **Not met** at 868,000: 0.484 against 0.515 | `tests/engine/test_engine.py::test_hybrid_is_not_worse_than_its_parts_on_paraphrases` |
+| Hybrid nDCG@10 not below the better of its parts on paraphrases | Met at 1,200 and 20,000 documents (equal to semantic). **Not met** at 868,000: 0.484 against 0.515, accepted by the owner | `tests/engine/test_engine.py::test_hybrid_is_not_worse_than_its_parts_on_paraphrases` |
 | Curve of recall and latency for three widths or more | Below | `tests/benchmark/test_scale_search.py` |
 
 ### Numbers
@@ -113,7 +113,7 @@ The same queries on PostgreSQL with its caches warm (`shared_buffers` of 2 GB; p
 
 ### Quality
 
-With 868,000 documents, 31 of the 100 paraphrase queries have text matches: 50 documents that contain every word of the query, none of them relevant, because the words are in planted distractors (an address, a company name). The fusion raises them, and the paraphrase queries lose 0.031. The queries that share vocabulary gain 0.066, and all together improve from 0.714 to 0.732. PostgreSQL loses in the same way (0.476 to 0.455). At 60,000 documents, where 2 queries have such matches, the loss is 0.001 or none, the same with text weights from 1 down to 0.1: a document in both rankings is raised whatever the weight, and a smaller one gives up part of the gain. The target is not changed. It is a limit of fusing by rank.
+With 868,000 documents, 31 of the 100 paraphrase queries have text matches: 50 documents that contain every word of the query, none of them relevant, because the words are in planted distractors (an address, a company name). The fusion raises them, and the paraphrase queries lose 0.031. The queries that share vocabulary gain 0.066, and all together improve from 0.714 to 0.732. PostgreSQL loses in the same way (0.476 to 0.455). At 60,000 documents, where 2 queries have such matches, the loss is 0.001 or none, the same with text weights from 1 down to 0.1: a document in both rankings is raised whatever the weight, and a smaller one gives up part of the gain. The target is not changed. It is a limit of fusing by rank. The owner accepted this result: the hybrid mode improves all queries together.
 
 ## Decisions
 

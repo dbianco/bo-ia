@@ -17,6 +17,7 @@ from src.api.issues import router as issues_router
 from src.api.notificaciones import router as notificaciones_router
 from src.api.search import router as search_router
 from src.api.suscripciones import router as suscripciones_router
+from src.auth.operator import TOKEN_VARIABLE, configured_token
 from src.config.installation import unfillable_filters, upsert_fuentes
 from src.connectors.registry import METADATA_KEYS
 from src.matching.matchers import matcher_from_environment
@@ -33,6 +34,8 @@ async def lifespan(app: FastAPI):
     # que el servicio arranque con configuración parcial.
     installation = get_installation_config()
     matcher = matcher_from_environment()
+    if not configured_token():
+        logger.warning("%s is not set: adding documents and running a source through the API are closed", TOKEN_VARIABLE)
     for clave in unfillable_filters(installation, METADATA_KEYS):
         logger.warning(
             "Config: no configured source can fill the filter '%s'; it will only find documents posted with that value",

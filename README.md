@@ -105,15 +105,22 @@ fuentes:
       provincia: Córdoba
 ```
 
-`metadata` holds values that are the same for the whole source, so that the declared filters find its documents. At startup, a declared filter that no source can fill is logged as a warning. Changing it affects new documents; `python -m src.commands.resegment` adds it to the stored ones (see below).
+`metadata` holds values that are the same for the whole source, so that the declared filters find its documents. At startup, a declared filter that no source can fill is logged as a warning. At startup it is also added to the documents the source already has.
 
-The scheduler runs **inside the same `backend` container** (it is not a separate service): on startup it schedules one job per source that has a connector, according to its `frecuencia_minutos`. Each run is recorded in `ejecuciones_fuente` (start, end, discovered, new, existing, errors). A source with no `conector` declared is still fed only by the seed or by a manual `POST /v1/documentos`, as in Etapa 1.
+The scheduler runs **inside the same `backend` container** (it is not a separate service): on startup it schedules one job per source that has a connector, according to its `frecuencia_minutos`. When a source is due comes from its last successful run, so a restart does not put it off: an overdue source runs shortly after startup (one after another if there are several, two at once at most), and another waits for its time. Days that were missed are not fetched later ([plan 13](docs/plans/13-source-coverage-and-health.md)).
+
+Each run is recorded in `ejecuciones_fuente` (start, end, discovered, new, existing, changed, errors). Its state is `completada`, `partial` if some items failed, or `fallida` if all did or the source could not be read. A document that failed is processed again the next time it arrives. A record that arrives again with other content is counted as `changed` and logged; the stored one is kept ([plan 11](docs/plans/11-deadlines-and-amendments.md)). A source with no `conector` declared is still fed only by the seed or by a manual `POST /v1/documentos`, as in Etapa 1.
 
 To trigger a run without waiting for the scheduler:
 
 ```bash
-curl -X POST http://localhost:9101/v1/fuentes/cordoba-provincial/ejecutar
+curl -X POST -H "Authorization: Bearer $OPERATOR_TOKEN" \
+  http://localhost:9101/v1/fuentes/cordoba-provincial/ejecutar
 ```
+
+#### Operator token
+
+Adding a document (`POST /v1/documentos`) and running a source require the secret of `OPERATOR_TOKEN`, sent as `Authorization: Bearer <token>`. Set it in `.env` (`openssl rand -hex 32` makes one) and restart the backend. **Without it both endpoints reject every request**, with a warning at startup; the scheduler and the sample data do not need it. A user's session does not replace it. Scripts that called these endpoints before have to send it.
 
 Connectors available today (`backend/src/connectors/registry.py`):
 
@@ -145,8 +152,8 @@ Endpoints exposed by the backend (`http://localhost:9101`):
 | `GET /v1/search` | Semantic search (`q`, `date_from`, `date_to`, `limit`, `mode`, `filtro.<key>` for each declared filter) |
 | `GET /v1/issues/{source}/{issue}` | The documents of one issue, together (for example `cordoba-provincial/4_Secc_240926`) |
 | `GET /v1/config` | Installation name and the filters declared in `installation.yaml` |
-| `POST /v1/documentos` | Ingests a document (validates, chunks, generates embeddings) |
-| `POST /v1/fuentes/{clave}/ejecutar` | Triggers a manual run of a source's connector |
+| `POST /v1/documentos` | Ingests a document (validates, chunks, generates embeddings). Requires the operator token |
+| `POST /v1/fuentes/{clave}/ejecutar` | Triggers a manual run of a source's connector. Requires the operator token |
 | `POST /v1/valoraciones` | Records a thumbs up/down on a result |
 | `POST /v1/auth/registro` | Creates an account (email + password) |
 | `POST /v1/auth/login` | Logs in, sets the `contextcrawl_sesion` cookie |

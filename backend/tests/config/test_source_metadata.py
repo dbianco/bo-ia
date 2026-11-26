@@ -70,6 +70,7 @@ def test_startup_warns_about_filters_that_cannot_be_filled(db_session: Session, 
 
     installation = _installation(metadata={"provincia": "Córdoba"})
     installation.seed = False
+    monkeypatch.setenv("OPERATOR_TOKEN", "x")  # or there would be another warning
     monkeypatch.setattr(main.logger, "disabled", False)  # the migrations of the fixture disable it
     monkeypatch.setattr(main, "get_installation_config", lambda: installation)
     monkeypatch.setattr(main.deps, "_engine", lambda: db_session.get_bind())

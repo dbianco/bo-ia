@@ -60,16 +60,16 @@ Migrations: `alembic upgrade head` runs from `backend/entrypoint.sh` on every co
 `ingerir_documento` (`backend/src/ingestor/contract.py`) is the only code path that persists, fragments and embeds documents. The `POST /v1/documentos` endpoint, the seed and connector runs all go through it with a `DocumentoNormalizado`.
 
 - It commits several times by design. The document is committed before fragmenting, so a failure leaves it saved with `estado="error"`.
-- Deduplication is by `(fuente, identificador_externo)`, then by content hash and date across all sources. The same text on another date is another document. Any existing row counts as already ingested, including one in `estado="error"`, so ingesting it again does not retry it.
+- Deduplication is by `(fuente, identificador_externo)`, then by content hash and date across all sources. The same text on another date is another document. Ingesting a document that exists in `estado="error"` processes it again from the stored row. Any other existing row counts as already ingested; one that arrives with other content is reported (`changed`, `src/ingestor/changes.py`) and not overwritten, apart from metadata keys it did not have.
 - The fixed metadata of the source (`fuentes.config["metadata"]`, from `installation.yaml`) is merged into every document. A value of the document wins.
 - `searchable=False` stores a document without fragments (`estado="not_searchable"`).
 - A genuinely new complete document is queued in `matching_queue`, in the same transaction. `MatchingWorker` (`src/matching/worker.py`, a thread started by the backend) processes it with `process_queue`: a `Matcher` finds the subscriptions, `match_document` records the matches and calls `crear_entregas_para_match` (`src/notifications/dispatcher.py`), which sends SMTP. Ingestion waits for none of it. A failed email is recorded as `fallida`; there is no automatic retry. Tests that need the matches call `drain_matching_queue` (`tests/conftest.py`).
 
 ### Connectors
 
-A connector only discovers and normalizes (`src/connectors/protocol.py`). It yields `DocumentoNormalizado` or `ErrorDescubrimiento` and never touches the DB or embeddings. `ejecutar_conector` (`src/connectors/runner.py`) ingests the results and records an `EjecucionFuente`. A per-document error is counted and the run continues. An exception from the connector itself marks the run `fallida`.
+A connector only discovers and normalizes (`src/connectors/protocol.py`). It yields `DocumentoNormalizado` or `ErrorDescubrimiento` and never touches the DB or embeddings. `ejecutar_conector` (`src/connectors/runner.py`) ingests the results and records an `EjecucionFuente`. A per-document error is counted and the run continues, and ends `partial`, or `fallida` if every item failed. An exception from the connector itself marks the run `fallida`.
 
-A new connector must be added to `CONECTORES`, `VERSIONES` and `METADATA_KEYS` in `src/connectors/registry.py`. `installation.yaml` refers to it by that `tipo` key. The in-process APScheduler (`src/scheduler/`) creates one job per source that has a `conector` block. `POST /v1/fuentes/{clave}/ejecutar` runs one manually.
+A new connector must be added to `CONECTORES`, `VERSIONES` and `METADATA_KEYS` in `src/connectors/registry.py`. `installation.yaml` refers to it by that `tipo` key. The in-process APScheduler (`src/scheduler/`) creates one job per source that has a `conector` block, first run when it is due since its last successful run. `POST /v1/fuentes/{clave}/ejecutar` runs one manually.
 
 `boletin-cba-pdf-diario` yields one document per notice. `src/connectors/pdf_pages.py` extracts pages and removes running headers by repetition. `src/connectors/boletin_cba/segmenter.py` splits at the closing lines; its segments are spans that must cover the text exactly, so nothing is lost. `src/ingestor/resegment.py` (command `python -m src.commands.resegment`) splits sections stored before that and marks them `superseded`, a state that search excludes.
 
@@ -114,7 +114,7 @@ Results are fragments, so one document can appear more than once. Subscription m
 
 Dependencies (`get_session`, `get_embedder`, `get_installation_config`, `get_usuario_actual`) live in `src/api/deps.py`. API tests replace them through `app.dependency_overrides` and use `FakeEmbeddingProvider` or a stub with fixed vectors. Fake vectors are hash-based, so their similarity carries no meaning. Use fixed vectors or `HashedEmbeddingProvider` when a test depends on ranking or the threshold. `src/processor/providers.py` chooses the provider from `EMBEDDING_PROVIDER`.
 
-Authentication uses server-side sessions with an HttpOnly cookie. `GET /v1/search` and `GET /v1/config` are public.
+Authentication uses server-side sessions with an HttpOnly cookie. `GET /v1/search` and `GET /v1/config` are public. `POST /v1/documentos` and `POST /v1/fuentes/{clave}/ejecutar` require `OPERATOR_TOKEN` (`src/auth/operator.py`), and are closed if it is not set. A new route that writes must be listed in `tests/api/test_write_token.py`.
 
 ### Synthetic corpus and benchmark
 
