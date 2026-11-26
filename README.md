@@ -17,7 +17,7 @@ ContextCrawl started as a semantic search over the Boletín Oficial (official ga
 - **Indexes them for search by meaning.** Each document is split into fragments and embedded locally with `Qwen/Qwen3-Embedding-0.6B`, stored in PostgreSQL with pgvector. Adding documents never requires retraining a model.
 - **Splits gazette issues into notices.** A section of the Córdoba gazette is one PDF with many unrelated notices. Each one is a document of its own, with its notice number and pages.
 - **Searches by meaning.** Semantic search with a similarity threshold is the default; a hybrid mode fuses it with full-text search. Results can be narrowed by date and by the filters the installation declares, and every result keeps its original text and source URL, with the notice number and page where the source has them.
-- **Monitors on behalf of users.** A user saves a search as a subscription. Every new document is evaluated against the active subscriptions as it is ingested, and a match is recorded with its score.
+- **Monitors on behalf of users.** A user saves a search as a subscription. Every new document is matched against the active subscriptions right after it is ingested, in the background, and a match is recorded with its score.
 - **Notifies.** Each match is delivered to the user's inbox in the app and, optionally, by email.
 - **Collects feedback.** Users can rate a result with a thumbs up or down.
 
@@ -66,7 +66,9 @@ curl -b cookies.txt -X POST http://localhost:9101/v1/suscripciones \
   -d '{"texto_busqueda": "licitaciones de obra vial", "filtros": {"municipio": "Carlos Paz"}}'
 ```
 
-When the ingestion of a genuinely new document finishes, the system evaluates it against every active subscription (synchronously, inside `ingerir_documento`): it applies the subscription's filters first and, if the document passes, compares the subscription's embedding with the document's fragments. A match is recorded in `evaluaciones_match` with its score, applied filters and date, and triggers its notifications (Etapa 4, see below).
+When the ingestion of a genuinely new document finishes, the document is left in a queue (`matching_queue`), in the same transaction. A background thread of the backend matches it: it finds the subscriptions whose filters the document passes and whose embedding is close enough to one of its fragments. A match is recorded in `evaluaciones_match` with its score, applied filters and date, and triggers its notifications (Etapa 4, see below). A failure is retried later and does not stop other documents.
+
+The subscriptions are in an index in memory, kept current from the database, so a document is not compared with each of them ([numbers](docs/plans/03-subscription-matching-engine.md#numbers)). `MATCHING_ENGINE=loop` goes back to one query per subscription.
 
 ## Notifications (Etapa 4)
 
@@ -204,6 +206,10 @@ curl "http://localhost:9101/v1/search?q=presupuesto+provincial"
 ### Without the model
 
 `EMBEDDING_PROVIDER=hashed` replaces the real model with offline vectors, for development on a machine without network: texts are close if they share words. `EMBEDDING_PROVIDER=precomputed` replays vectors from a file (`EMBEDDING_PRECOMPUTED`). The vectors of two providers cannot be compared, so do not change it on a database that already has documents. The hashed vectors also need a lower `SIMILARITY_THRESHOLD` than the real model.
+
+## Search engine
+
+`SEARCH_ENGINE` chooses who answers searches. `postgres` (the default) uses pgvector and PostgreSQL full-text search. `engine` uses an engine in the backend process: BM25, a vector index with filters applied during the search, and the same fusion. The response is the same. The engine is built from the database at every start, and PostgreSQL answers until it is ready; it takes about 5.5 GB per million fragments ([numbers](docs/plans/04-hybrid-ranking-engine.md#numbers)). `RRF_WEIGHTS` sets the weights of the vector and text rankings.
 
 ## Benchmark
 

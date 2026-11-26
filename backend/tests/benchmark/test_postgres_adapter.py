@@ -52,3 +52,29 @@ def test_threshold_does_not_leak_to_the_environment(corpus, monkeypatch) -> None
         with PostgresSearch(url, corpus, FakeEmbeddingProvider(), mode="semantic", threshold=0.1):
             pass
     assert os.environ["SIMILARITY_THRESHOLD"] == "0.73"
+
+
+def test_scale_command_measures_postgres_on_a_bulk_loaded_database(tmp_path, capsys) -> None:
+    import json
+
+    from src.benchmark.__main__ import main
+
+    before = _databases()
+    main(["scale-search", "--documents", "300", "--queries", "5", "--database-url", ADMIN_DATABASE_URL,
+          "--out", str(tmp_path)])  # fmt: skip
+    timings = json.loads((tmp_path / "timings.json").read_text(encoding="utf-8"))
+    assert {"semantic", "hybrid", "all", "read_10_rows", "load_seconds"} <= set(timings)
+    assert "hybrid" in capsys.readouterr().out
+    assert _databases() == before
+
+
+def test_scale_matching_measures_the_sql_loop(tmp_path) -> None:
+    import json
+
+    from src.benchmark.__main__ import main
+
+    main(["scale-matching", "--subscriptions", "50", "--corpus-documents", "200", "--documents", "3", "--fragments", "2",
+          "--database-url", ADMIN_DATABASE_URL, "--out", str(tmp_path)])  # fmt: skip
+    timings = json.loads((tmp_path / "timings.json").read_text(encoding="utf-8"))
+    assert timings["sql_loop"]["measured_subscriptions"] == 50
+    assert timings["sql_loop"]["ms_per_subscription"] > 0

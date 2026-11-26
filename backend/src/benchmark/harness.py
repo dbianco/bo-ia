@@ -29,7 +29,7 @@ DEFAULT_KS = (10, 50)
 DECIMALS = 4
 
 
-def _timing(seconds: Sequence[float]) -> dict[str, float]:
+def timing(seconds: Sequence[float]) -> dict[str, float]:
     total = sum(seconds)
     return {
         "count": len(seconds),
@@ -66,7 +66,7 @@ def evaluate_search(
         rows = [s for k, s in per_query if kind in ("all", k)]
         if rows:
             quality[kind] = {metric: round(mean([r[metric] for r in rows]), DECIMALS) for metric in sorted(rows[0])}
-    return quality, _timing(seconds)
+    return quality, timing(seconds)
 
 
 def evaluate_matching(system: MatchSystem, corpus: Corpus) -> tuple[dict[str, float], dict[str, float]]:
@@ -80,7 +80,7 @@ def evaluate_matching(system: MatchSystem, corpus: Corpus) -> tuple[dict[str, fl
         for subscription in matched:
             actual.setdefault(subscription, set()).add(document.identificador_externo)
     scores = match_scores(expected, actual)
-    return {k: round(v, DECIMALS) if isinstance(v, float) else v for k, v in scores.items()}, _timing(seconds)
+    return {k: round(v, DECIMALS) if isinstance(v, float) else v for k, v in scores.items()}, timing(seconds)
 
 
 @dataclass
@@ -166,12 +166,13 @@ def format_timings(timings: dict) -> str:
     return "\n".join(_table(["timing", *columns], rows))
 
 
-def write_report(result: BenchmarkResult, directory: Path) -> None:
+def write_report(result: BenchmarkResult, directory: Path, *, text: bool = True) -> None:
     directory.mkdir(parents=True, exist_ok=True)
 
     def write(name: str, text: str) -> None:
         (directory / name).write_text(text, encoding="utf-8", newline="\n")
 
     write("report.json", json.dumps(result.report, indent=1, ensure_ascii=False) + "\n")
-    write("report.txt", format_report(result.report))
+    if text:
+        write("report.txt", format_report(result.report))
     write("timings.json", json.dumps(result.timings, indent=1, ensure_ascii=False) + "\n")

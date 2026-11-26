@@ -63,7 +63,7 @@ Migrations: `alembic upgrade head` runs from `backend/entrypoint.sh` on every co
 - Deduplication is by `(fuente, identificador_externo)`, then by content hash and date across all sources. The same text on another date is another document. Any existing row counts as already ingested, including one in `estado="error"`, so ingesting it again does not retry it.
 - The fixed metadata of the source (`fuentes.config["metadata"]`, from `installation.yaml`) is merged into every document. A value of the document wins.
 - `searchable=False` stores a document without fragments (`estado="not_searchable"`).
-- For each genuinely new complete document it calls `evaluar_documento` (`src/subscriptions/evaluator.py`), which calls `crear_entregas_para_match` (`src/notifications/dispatcher.py`). All of this is synchronous, including SMTP sends. A failed email is recorded as `fallida` and must not interrupt ingestion. There is no automatic retry.
+- A genuinely new complete document is queued in `matching_queue`, in the same transaction. `MatchingWorker` (`src/matching/worker.py`, a thread started by the backend) processes it with `process_queue`: a `Matcher` finds the subscriptions, `match_document` records the matches and calls `crear_entregas_para_match` (`src/notifications/dispatcher.py`), which sends SMTP. Ingestion waits for none of it. A failed email is recorded as `fallida`; there is no automatic retry. Tests that need the matches call `drain_matching_queue` (`tests/conftest.py`).
 
 ### Connectors
 
@@ -83,22 +83,32 @@ Connector tests use local files in `tests/fixtures/`. The `*_live.py` files are 
 
 Keep domain-specific vocabulary out of the engine. It belongs in config, connectors, `src/ingestor/adapters/` and seed data. Per-vertical fields live in the `documentos.metadata` JSONB column. The query instruction in `src/processor/embeddings.py` still mentions government bulletins.
 
-`src/search/filters.py` has two implementations of the same filter semantics that must stay consistent:
+The filter semantics have four implementations that must stay consistent (property tests compare them):
 
 - `aplicar_filtros` builds SQL for search.
 - `cumple_filtros` is pure Python for subscription matching.
+- `FilterIndex` (`src/matching/filter_index.py`) is the indexed version of `cumple_filtros`.
+- `MetadataIndex` (`src/engine/metadata.py`) is the engine's version of `aplicar_filtros`.
 
 A subscription stores a snapshot of each filter's type and value, so later config changes do not alter how it is evaluated.
 
+### Matching
+
+`src/matching/matchers.py` has the two implementations (`MATCHING_ENGINE`): `SqlLoopMatcher`, the reference, and `IndexedMatcher` (default), which keeps a `SubscriptionIndex` in memory: `FilterIndex` (exact, must agree with `cumple_filtros`) and `src/vector/hnsw.py`. Indexes in memory are kept current through `changed_xid` columns written by triggers: read `pg_snapshot_xmin` first and then the rows. `Suscripcion.ultima_evaluacion` is computed from `matching_state`; do not write it.
+
 ### Search
 
-`buscar` in `src/api/search.py` over-fetches fragment candidates, then applies the threshold and then the limit. `SIMILARITY_THRESHOLD` is internal and not exposed in the API.
+`GET /v1/search` goes through a `SearchBackend` (`src/engine/backend.py`, `SEARCH_ENGINE`): PostgreSQL by default, or the in-process engine in `src/engine/`. The tests of the search API run on both (`tests/api/conftest.py`).
+
+The compiled kernels (`src/vector/kernels.py`, `src/engine/lexical_kernels.py`) never start threads; callers run them from a thread pool. Results must not depend on the number of threads.
+
+`buscar` in `src/search/postgres.py` over-fetches fragment candidates, then applies the threshold and then the limit. `SIMILARITY_THRESHOLD` is internal and not exposed in the API.
 
 - `semantic` (default): vector results above the threshold.
 - `hybrid`: vector and Spanish full-text results fused with RRF. A result without a text match still has to pass the threshold.
 - `all`: the same fusion with no threshold.
 
-Results are fragments, so one document can appear more than once. Subscription matching uses the same threshold against the best fragment of the new document.
+Results are fragments, so one document can appear more than once. Subscription matching uses the same threshold against the best fragment of the new document. The engine must keep the same meaning for each mode.
 
 ### API wiring
 

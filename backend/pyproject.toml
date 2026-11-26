@@ -12,6 +12,7 @@ dependencies = [
     "sentence-transformers>=6.0,<7.0",
     "transformers>=5.10,<6.0",  # >=5.10.0 corrige CVE-2026-9856 y las demás CVEs de PYSEC-2026-* (pip-audit)
     "numpy>=1.26,<3.0",  # offline embeddings and benchmark; sentence-transformers already brought it in
+    "numba>=0.61,<1.0",  # compiles the inner loops of the vector and lexical indexes; no toolchain needed
     "alembic>=1.14,<2.0",
     "pydantic-settings>=2.6,<3.0",
     "pyyaml>=6.0,<7.0",  # parsea installation.yaml (config de instalación); no hay parser YAML en la librería estándar

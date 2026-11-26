@@ -75,7 +75,9 @@ The benchmark command of plan 1, from `backend/`. It needs no database, no netwo
 .venv/bin/python -m src.benchmark run      --profile gazette --seed 42 --documents 2000 --out benchmark-output/run
 ```
 
-`generate` writes the documents, the truth file and the synonym table. `run` writes `report.txt` and `report.json`, which are identical between runs with the same arguments, and `timings.json`, which is not. To measure the PostgreSQL implementation, add `--systems` with any of `postgres-semantic`, `postgres-hybrid`, `postgres-all` and `postgres-match`, and `--database-url` with the server to use. They run in a database of their own, created and dropped by the command. `--provider model` uses the real model, and `precompute` saves its vectors to replay them offline with `--provider precomputed`.
+`generate` writes the documents, the truth file and the synonym table. `run` writes `report.txt` and `report.json`, which are identical between runs with the same arguments, and `timings.json`, which is not. To measure the PostgreSQL implementation, add `--systems` with any of `postgres-semantic`, `postgres-hybrid`, `postgres-all` and `postgres-match`, and `--database-url` with the server to use. They run in a database of their own, created and dropped by the command. `scale-matching` and `scale-search` are the scale runs of plans 3 and 4: by default a million subscriptions or fragments, some 20 minutes and 10 GB each. With `--database-url` they measure PostgreSQL too (`scale-search`, only it).
+
+`--provider model` uses the real model, and `precompute` saves its vectors to replay them offline with `--provider precomputed`.
 
 For every plan that adds a database migration, `tests/test_migrations.py` is updated so that the new downgrade is exercised.
 

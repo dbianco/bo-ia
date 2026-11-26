@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.auth.sessions import obtener_usuario_de_sesion
 from src.config.installation import InstallationConfig, cargar_installation_config
 from src.db.models import Usuario
+from src.engine.backend import SearchBackend, backend_from_environment
 from src.processor.embeddings import EmbeddingProvider
 from src.processor.providers import provider_from_environment
 
@@ -45,6 +46,15 @@ def _embedder() -> EmbeddingProvider:
 
 def get_embedder() -> EmbeddingProvider:
     return _embedder()
+
+
+@lru_cache
+def _search_backend() -> SearchBackend:
+    return backend_from_environment()
+
+
+def get_search_backend() -> SearchBackend:
+    return _search_backend()
 
 
 @lru_cache

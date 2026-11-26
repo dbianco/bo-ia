@@ -17,6 +17,7 @@ from src.db.models import Documento, Fuente, Usuario
 from src.ingestor.contract import DocumentoNormalizado, ingerir_documento
 from src.processor.hashed_embeddings import HashedEmbeddingProvider
 from src.synthetic.pdf import write_pdf
+from tests.conftest import drain_matching_queue
 
 ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = ROOT / "backend" / "tests" / "fixtures"
@@ -181,6 +182,7 @@ def test_an_alert_says_where_to_find_the_notice(db_session: Session, make_client
     db_session.commit()
     monkeypatch.setenv("SIMILARITY_THRESHOLD", "0.2")
     _gazette(db_session)
+    drain_matching_queue(db_session)
     assert len(sent) == 1
     assert "Aviso Nº 688769" in sent[0]["cuerpo"]
     assert "Páginas 4 a 5" in sent[0]["cuerpo"]

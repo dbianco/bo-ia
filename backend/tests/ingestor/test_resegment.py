@@ -16,6 +16,7 @@ from src.ingestor.contract import DocumentoNormalizado, ingerir_documento
 from src.ingestor.resegment import resegment_source
 from src.processor.hashed_embeddings import HashedEmbeddingProvider
 from src.synthetic.issues import generate_issue
+from tests.conftest import drain_matching_queue
 
 PDF = Path(__file__).resolve().parents[1] / "fixtures" / "boletin_cba" / "4_Secc_sample.pdf"
 DAY = datetime.date(2026, 9, 24)
@@ -139,9 +140,11 @@ def test_old_notices_raise_no_alerts_and_history_is_kept(db_session: Session, em
     fragment = db_session.scalars(select(Fragmento).where(Fragmento.documento_id == section.id)).first()
     db_session.add(Valoracion(fragmento_id=fragment.id, consulta="x", valor="positivo"))
     db_session.commit()
+    drain_matching_queue(db_session)
     assert len(db_session.scalars(select(EvaluacionMatch)).all()) == 1
 
     resegment_source(db_session, embedder, source, CONNECTOR)
+    drain_matching_queue(db_session)
     matches = db_session.scalars(select(EvaluacionMatch)).all()
     assert [m.documento_id for m in matches] == [section.id]
     assert len(db_session.scalars(select(Valoracion)).all()) == 1

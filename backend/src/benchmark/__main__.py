@@ -10,23 +10,42 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
 import signal
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from src.benchmark.harness import format_report, format_timings, run_benchmark, write_report
-from src.benchmark.systems import BruteForceMatch, LexicalSearch, OracleMatch, OracleSearch, VectorExactSearch
+from src.benchmark.scale_matching import ScaleMatchingConfig, format_scale_matching, run_scale_matching
+from src.benchmark.scale_search import (
+    ScaleSearchConfig,
+    format_scale_search,
+    run_scale_postgres,
+    run_scale_search,
+)
+from src.benchmark.systems import (
+    BruteForceMatch,
+    EngineSearch,
+    IndexedMatch,
+    LexicalSearch,
+    OracleMatch,
+    OracleSearch,
+    VectorExactSearch,
+)
 from src.ingestor.fragmenter import fragmentar_texto
+from src.matching.matchers import IndexedMatcher
 from src.processor.embeddings import EMBEDDING_DIM, EmbeddingProvider
 from src.processor.hashed_embeddings import HashedEmbeddingProvider
 from src.processor.precomputed_embeddings import MissingPrecomputedEmbedding, write_precomputed
 from src.processor.providers import PROVIDERS, create_provider, describe_provider
 from src.synthetic.corpus import PROFILES, Corpus, CorpusConfig, generate_corpus, write_corpus
 
-OFFLINE_SYSTEMS = ("oracle", "lexical", "vector-exact", "match-brute-force")
+OFFLINE_SYSTEMS = ("oracle", "lexical", "vector-exact", "match-brute-force", "match-indexed")
+ENGINE_SYSTEMS = ("engine-lexical", "engine-semantic", "engine-hybrid", "engine-all")
 POSTGRES_SEARCH = ("postgres-semantic", "postgres-hybrid", "postgres-all")
-SYSTEMS = (*OFFLINE_SYSTEMS, *POSTGRES_SEARCH, "postgres-match")
+POSTGRES_MATCH = ("postgres-match", "postgres-match-indexed")
+SYSTEMS = (*OFFLINE_SYSTEMS, *ENGINE_SYSTEMS, *POSTGRES_SEARCH, *POSTGRES_MATCH)
 NEED_EMBEDDINGS = set(SYSTEMS) - {"oracle", "lexical"}
 
 # Share of the phrases that the offline provider is told are synonyms, and the
@@ -63,7 +82,26 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD, help="similarity threshold")
     run.add_argument("--database-url", help="PostgreSQL server for the postgres-* systems, which run in a "
                                             "database of their own, created and dropped by the command")
+    scale = commands.add_parser("scale-matching", help="measure the matching engine with many subscriptions")
+    _add_fields(scale, ScaleMatchingConfig)
+    scale.add_argument("--database-url", help="also measure the loop with a query per subscription")
+    scale.add_argument("--out", type=Path, required=True)
+    scale = commands.add_parser("scale-search", help="measure the search engine with many fragments")
+    _add_fields(scale, ScaleSearchConfig)
+    scale.add_argument("--database-url", help="measure PostgreSQL instead, in a database created and dropped for it")
+    scale.add_argument("--out", type=Path, required=True)
     return parser
+
+
+def _add_fields(parser: argparse.ArgumentParser, config: type) -> None:
+    """One option for each field of a configuration."""
+    for field in dataclasses.fields(config):
+        kind = type(field.default) if field.default is not None else int
+        parser.add_argument(f"--{field.name.replace('_', '-')}", type=kind, default=field.default)
+
+
+def _config(args: argparse.Namespace, config: type):
+    return config(**{field.name: getattr(args, field.name) for field in dataclasses.fields(config)})
 
 
 def _generate(args: argparse.Namespace) -> Corpus:
@@ -124,14 +162,25 @@ def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
             search.append(LexicalSearch(corpus.documents, filters))
         if "vector-exact" in requested:
             search.append(VectorExactSearch(corpus.documents, provider, filters))
+        on_engine = [s for s in requested if s in ENGINE_SYSTEMS]
+        if on_engine:
+            engine = EngineSearch.build(corpus.documents, provider, filters)
+            search += [
+                engine.with_mode(name.removeprefix("engine-"), threshold=args.threshold) for name in on_engine
+            ]
         if "match-brute-force" in requested:
             match.append(BruteForceMatch(corpus.truth.subscriptions, provider, filters, threshold=args.threshold))
+        if "match-indexed" in requested:
+            match.append(IndexedMatch(corpus.truth.subscriptions, provider, filters, threshold=args.threshold))
         if on_postgres:
             from src.benchmark.postgres import PostgresMatch, PostgresSearch, scratch_database
 
-            if "postgres-match" in on_postgres:  # measures ingestion, so it needs an empty database
+            for name in (s for s in on_postgres if s in POSTGRES_MATCH):
+                # It measures ingestion too, so it needs an empty database.
                 url = stack.enter_context(scratch_database(args.database_url))
-                match.append(stack.enter_context(PostgresMatch(url, corpus, provider, threshold=args.threshold)))
+                matcher = IndexedMatcher() if name.endswith("indexed") else None
+                system = PostgresMatch(url, corpus, provider, threshold=args.threshold, matcher=matcher)
+                match.append(stack.enter_context(system))
             if set(on_postgres) & set(POSTGRES_SEARCH):
                 url = stack.enter_context(scratch_database(args.database_url))
                 for name in (s for s in on_postgres if s in POSTGRES_SEARCH):
@@ -161,6 +210,22 @@ def main(argv: Sequence[str] | None = None) -> None:
             print(f"{len(corpus.documents)} documents written to {args.out}")
         elif args.command == "precompute":
             _precompute(args)
+        elif args.command == "scale-matching":
+            result = run_scale_matching(_config(args, ScaleMatchingConfig), database_url=args.database_url)
+            write_report(result, args.out, text=False)
+            print(format_scale_matching(result))
+        elif args.command == "scale-search":
+            if args.database_url and args.dim != EMBEDDING_DIM:
+                parser.error(f"PostgreSQL needs --dim {EMBEDDING_DIM}")
+            if args.database_url:
+                result = run_scale_postgres(_config(args, ScaleSearchConfig), args.database_url)
+                summary = format_timings({"search": {k: v for k, v in result.timings.items() if isinstance(v, dict) and "p50_ms" in v},
+                                          "matching": {}})  # fmt: skip
+            else:
+                result = run_scale_search(_config(args, ScaleSearchConfig))
+                summary = format_scale_search(result)
+            write_report(result, args.out, text=False)
+            print(summary)
         else:
             _run(parser, args)
     except (ValueError, MissingPrecomputedEmbedding) as exc:

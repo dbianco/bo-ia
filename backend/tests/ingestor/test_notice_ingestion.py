@@ -9,6 +9,7 @@ from src.db.models import Documento, EvaluacionMatch, Fragmento, Fuente, Suscrip
 from src.ingestor.contract import DocumentoNormalizado, ingerir_documento
 from src.ingestor.fragmenter import fragment_spans, fragmentar_texto
 from src.processor.hashed_embeddings import HashedEmbeddingProvider
+from tests.conftest import drain_matching_queue
 
 DAY = datetime.date(2026, 9, 24)
 
@@ -96,6 +97,7 @@ def test_a_document_that_is_not_searchable_is_stored_without_fragments_or_matche
     assert result.documento.estado == "not_searchable"
     assert result.fragmentos_creados == 0
     assert db_session.scalars(select(Fragmento)).all() == []
+    drain_matching_queue(db_session)
     assert db_session.scalars(select(EvaluacionMatch)).all() == []
     assert ingerir_documento(db_session, embedder, _notice(searchable=False)).ya_existia
 
@@ -111,12 +113,14 @@ def test_two_notices_of_one_issue_give_two_alerts(db_session: Session, embedder)
                 identificador_externo=f"N{number}", notice_number=number, texto=f"Licitación pública ministerio {number}"
             ),
         )
+    drain_matching_queue(db_session)
     assert len(db_session.scalars(select(EvaluacionMatch)).all()) == 2
 
 
 def test_ingestion_without_alerts(db_session: Session, embedder) -> None:
     _subscribe(db_session, embedder, "licitación pública ministerio")
     ingerir_documento(db_session, embedder, _notice(texto="Licitación pública ministerio"), evaluate=False)
+    drain_matching_queue(db_session)
     assert db_session.scalars(select(EvaluacionMatch)).all() == []
     assert db_session.scalars(select(Fragmento)).all()
 
@@ -131,6 +135,7 @@ def test_fixed_metadata_of_the_source_is_added_to_every_document(db_session: Ses
         db_session, embedder, _notice(texto="licitación pública", metadata={"seccion": 4})
     ).documento
     assert document.metadata_ == {"provincia": "Córdoba", "seccion": 4}
+    drain_matching_queue(db_session)
     match = db_session.scalars(select(EvaluacionMatch)).one()
     assert match.suscripcion_id == subscription.id
 

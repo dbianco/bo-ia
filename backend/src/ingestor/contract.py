@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 
 from src.db.models import NOT_SEARCHABLE, Documento, Fragmento, Fuente
 from src.ingestor.fragmenter import fragment_spans
+from src.matching.queue import enqueue
 from src.processor.embeddings import EmbeddingProvider
-from src.subscriptions.evaluator import evaluar_documento
 
 
 class DocumentoInvalido(ValueError):
@@ -119,7 +119,7 @@ def ingerir_documento(
 
     The fixed metadata of the source (`fuentes.config["metadata"]`) is added to
     the document; a value of the document itself wins. With `evaluate=False` the
-    document is not matched against subscriptions: no alerts.
+    document is not queued to be matched against subscriptions: no alerts.
 
     El documento se commitea apenas se valida, antes de fragmentar: así,
     si la fragmentación o el embedding fallan, el documento ya recibido no
@@ -189,6 +189,10 @@ def ingerir_documento(
                 )
             )
         documento.estado = "completo"
+        if evaluate:
+            # FR-012: solo para un documento genuinamente nuevo y ya completo.
+            # Queued in the same transaction: matching happens later, on its own.
+            enqueue(session, documento)
         session.commit()
     except Exception as exc:
         session.rollback()  # descarta fragmentos parcialmente insertados
@@ -197,11 +201,5 @@ def ingerir_documento(
         raise ErrorDeProcesamiento(
             "Error al fragmentar o generar embeddings; el documento quedó registrado con estado 'error'."
         ) from exc
-
-    # FR-012: solo para un documento genuinamente nuevo y ya completo. Fuera
-    # del try/except de arriba a propósito: un error acá no debe revertir un
-    # documento que ya se ingirió bien a estado="error".
-    if evaluate:
-        evaluar_documento(session, documento)
 
     return ResultadoIngesta(documento=documento, ya_existia=False, fragmentos_creados=len(spans))

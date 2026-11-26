@@ -11,6 +11,7 @@ from src.api.main import app
 from src.config.installation import InstallationConfig
 from src.db.models import Documento, Fuente
 from src.ingestor.contract import DocumentoNormalizado, ingerir_documento
+from tests.conftest import drain_matching_queue
 
 INSTALLATION = InstallationConfig(nombre="test")
 
@@ -57,6 +58,7 @@ def _ingerir_documento_que_matchea(db_session: Session) -> None:
         url_fuente="https://example.org/doc-1",
     )
     ingerir_documento(db_session, _EmbedderFijo(), doc)
+    drain_matching_queue(db_session)  # plan 3: matching is not part of ingestion
     assert db_session.query(Documento).count() == 1
 
 

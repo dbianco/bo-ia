@@ -12,8 +12,10 @@ from typing import Protocol
 import numpy as np
 
 from src.config.installation import Filtro
+from src.engine.engine import EngineFragment, SearchEngine
 from src.ingestor.contract import DocumentoNormalizado
 from src.ingestor.fragmenter import fragmentar_texto
+from src.matching.subscription_index import SubscriptionIndex
 from src.processor.embeddings import EmbeddingProvider
 from src.search.filters import construir_filtros_suscripcion, cumple_filtros
 from src.synthetic.corpus import Subscription, Truth
@@ -23,6 +25,7 @@ from src.text.tokens import content_tokens
 # last bit of a floating point sum cannot reorder results between machines.
 SCORE_DECIMALS = 5
 EMBED_BATCH = 256
+EMBED_DOCUMENTS = 20_000
 
 
 class SearchSystem(Protocol):
@@ -202,6 +205,91 @@ class VectorExactSearch:
             order = np.lexsort((np.arange(len(similarity)), -np.round(similarity, SCORE_DECIMALS)))
             result.append(order[:k].tolist())
         return result
+
+
+class EngineSearch:
+    """The search engine of plan 4, in this process. Documents, not fragments:
+    each one counts once, as its best fragment."""
+
+    FRAGMENTS_PER_DOCUMENT = 4
+
+    def __init__(
+        self, engine: SearchEngine, ids: Sequence[str], provider: EmbeddingProvider, filters: Sequence[Filtro],
+        mode: str, threshold: float,
+    ) -> None:  # fmt: skip
+        self.name = f"engine-{mode}"
+        self.engine = engine
+        self._ids = ids
+        self._provider = provider
+        self._filters = filters
+        self._mode = mode
+        self._threshold = threshold
+
+    @classmethod
+    def build(
+        cls, documents: Sequence[DocumentoNormalizado], provider: EmbeddingProvider, filters: Sequence[Filtro], **options
+    ) -> EngineSearch:
+        """Use `with_mode` on the result for each mode: the engine is shared."""
+        engine: SearchEngine | None = None
+        fragment_id = 0
+        for start in range(0, len(documents), EMBED_DOCUMENTS):
+            chunk = documents[start : start + EMBED_DOCUMENTS]
+            texts = [fragmentar_texto(d.texto) for d in chunk]
+            matrix = embed_passages(provider, [t for own in texts for t in own])
+            engine = engine or SearchEngine(matrix.shape[1], **options)
+            vectors = iter(matrix)
+            batch = []
+            for position, (document, own) in enumerate(zip(chunk, texts, strict=True), start=start):
+                fragments = []
+                for text in own:
+                    fragments.append(EngineFragment(fragment_id, text, next(vectors)))
+                    fragment_id += 1
+                batch.append((position, document.fecha, document.metadata, fragments))
+            engine.put_many(batch)
+        return cls(engine, [d.identificador_externo for d in documents], provider, filters, "semantic", 0.0)
+
+    def with_mode(self, mode: str, *, threshold: float) -> EngineSearch:
+        return EngineSearch(self.engine, self._ids, self._provider, self._filters, mode, threshold)
+
+    def search(self, query: str, filters: dict[str, str], k: int) -> list[str]:
+        hits = self.engine.search(
+            query,
+            embed_query(self._provider, query),
+            mode=self._mode,
+            limit=k * self.FRAGMENTS_PER_DOCUMENT,
+            threshold=self._threshold,
+            filters=filters,
+            filters_declared=self._filters,
+        )
+        return list(dict.fromkeys(self._ids[h.document_id] for h in hits))[:k]
+
+
+class IndexedMatch:
+    """The matching engine of plan 3, in this process."""
+
+    name = "match-indexed"
+
+    def __init__(
+        self,
+        subscriptions: Sequence[Subscription],
+        provider: EmbeddingProvider,
+        filters: Sequence[Filtro],
+        *,
+        threshold: float,
+    ) -> None:
+        self._provider = provider
+        self._threshold = threshold
+        self._identifiers = [s.id for s in subscriptions]
+        vectors = [embed_query(provider, s.text) for s in subscriptions]
+        self._index = SubscriptionIndex(len(vectors[0]))
+        self._index.add_many(
+            (i, vector, construir_filtros_suscripcion(s.filters, list(filters)), True)
+            for i, (s, vector) in enumerate(zip(subscriptions, vectors, strict=True))
+        )
+
+    def match(self, document: DocumentoNormalizado) -> set[str]:
+        fragments = embed_passages(self._provider, fragmentar_texto(document.texto))
+        return {self._identifiers[i] for i in self._index.match(document.metadata, fragments, self._threshold)}
 
 
 class BruteForceMatch:

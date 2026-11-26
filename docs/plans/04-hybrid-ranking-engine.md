@@ -69,9 +69,62 @@ Measured on the synthetic corpus from plan 1 at a proposed scale of 1,000,000 fr
 - Quality: hybrid nDCG@10 not below the better of lexical and semantic on the paraphrase queries.
 - A published recall and latency curve for at least three search widths.
 
-## Open decisions
+## Status
 
-- Language. Python keeps one codebase but makes the latency target hard; a compiled core (Rust or C) behind a Python binding makes it reachable at the cost of a second toolchain.
-- Whether the engine holds vectors in memory or memory-maps them from disk.
-- Whether result scores shown to users remain cosine similarities, since the threshold is defined on them.
-- Persistence, updates and deletes: see plan 5.
+Implemented. Not marked as done yet: one criterion is not met at full scale (see Quality), and `pytest -m slow` and `pytest -m docker` have not been run, because the machine had neither the model nor Docker.
+
+| Criterion | Result | Test |
+|---|---|---|
+| Pruned top 10 equals the exhaustive one | Met: 0 differences in 400 searches (200 queries, any word and every word), scoring 0.4% of the postings | `tests/engine/test_lexical.py::test_the_pruned_top_equals_the_exhaustive_one`, `tests/benchmark/test_scale_search.py::test_pruned_lexical_results_equal_the_exhaustive_ones` |
+| Recall@10 of at least 0.95, also under filters that keep 1% | Met with the default width of 128: 0.973 without filters, 0.976 keeping 30%, 0.991 keeping 10%, 1.000 keeping 1% (scanned) | `tests/vector/test_hnsw.py::test_recall_under_filters`, `tests/benchmark/test_scale_search.py::test_recall_with_and_without_filters` |
+| Hybrid p95 below PostgreSQL, proposed under 50 ms | Met: 26.5 ms in the engine. With reading the 10 rows of the result (15.7 ms) some 42 ms, against 102 ms for PostgreSQL | `python -m src.benchmark scale-search`, with and without `--database-url` |
+| Hybrid nDCG@10 not below the better of its parts on paraphrases | Met at 1,200 and 20,000 documents (equal to semantic). **Not met** at 868,000: 0.484 against 0.515 | `tests/engine/test_engine.py::test_hybrid_is_not_worse_than_its_parts_on_paraphrases` |
+| Curve of recall and latency for three widths or more | Below | `tests/benchmark/test_scale_search.py` |
+
+### Numbers
+
+Gazette profile, seed 42, 868,000 documents, 1,000,380 fragments, 200 queries. Hashed provider, dimension 1024, synonym coverage 0.8, threshold 0.45. Four virtual CPUs, Intel Xeon (Ice Lake) at 2.60 GHz, 15 GB. Building everything, with the embedding, takes 25 minutes.
+
+Recall@10 against an exact scan, and p95:
+
+| Width | No filter | Keeps 30% | Keeps 10% | Keeps 1% |
+|---|---|---|---|---|
+| 32 | 0.928, 1.3 ms | 0.968, 1.9 ms | 0.982, 3.2 ms | 1.000, 13 ms |
+| 64 | 0.957, 1.4 ms | 0.973, 2.4 ms | 0.987, 5.5 ms | 1.000, 13 ms |
+| **128** | **0.973, 2.0 ms** | **0.976, 4.3 ms** | **0.991, 9.3 ms** | **1.000, 14 ms** |
+| 256 | 0.977, 3.3 ms | 0.981, 7.1 ms | 0.997, 17 ms | 1.000, 14 ms |
+| 512 | 0.980, 5.6 ms | 0.986, 13 ms | 0.998, 30 ms | 1.000, 14 ms |
+| exact scan | 288 ms | 72 ms | 33 ms | 13 ms |
+
+| Mode, limit 10 | p95 in the engine | nDCG@10, paraphrase | nDCG@10, same vocabulary |
+|---|---|---|---|
+| lexical (any word) | 22 ms | 0.000 | 0.964 |
+| semantic | 9 ms | 0.515 | 0.913 |
+| hybrid | 27 ms | 0.484 | 0.979 |
+| all | 27 ms | 0.485 | 0.979 |
+
+The same queries on PostgreSQL with its caches warm (`shared_buffers` of 2 GB; pgvector with its default width of 40), including the embedding of the query and reading the rows. Loading took 29 minutes. Reading the 10 rows of a result, which the engine's figures above do not include, has a p95 of 15.7 ms.
+
+| Mode, limit 10 | p95 | nDCG@10, paraphrase | nDCG@10, same vocabulary |
+|---|---|---|---|
+| semantic | 54 ms | 0.476 | 0.882 |
+| hybrid | 102 ms | 0.455 | 0.971 |
+| all | 84 ms | 0.455 | 0.960 |
+
+### Quality
+
+With 868,000 documents, 31 of the 100 paraphrase queries have text matches: 50 documents that contain every word of the query, none of them relevant, because the words are in planted distractors (an address, a company name). The fusion raises them, and the paraphrase queries lose 0.031. The queries that share vocabulary gain 0.066, and all together improve from 0.714 to 0.732. PostgreSQL loses in the same way (0.476 to 0.455). At 60,000 documents, where 2 queries have such matches, the loss is 0.001 or none, the same with text weights from 1 down to 0.1: a document in both rankings is raised whatever the weight, and a smaller one gives up part of the gain. The target is not changed. It is a limit of fusing by rank.
+
+## Decisions
+
+- **Language.** Python, with the inner loops compiled by Numba: a dependency that installs with pip, no second toolchain. The latency target is met. Numba only loads with the engine or with 20,000 subscriptions or more; compiling takes some seconds the first time, and is cached.
+- **Memory.** Vectors in memory: about 4 GB per million fragments, 1 GB of 8-bit codes for the traversal, and 0.5 GB for the rest. Mapping them from disk goes with the persistence of plan 5.
+- **Scores shown** are still cosine similarities, computed exactly. A text match outside the vector candidates now shows its similarity, and not 0.
+- **Text matches** still need every word of the query, as now: the results that skip the threshold do not change. BM25 with any word is there for comparison (`engine-lexical`): on paraphrases it would only add noise.
+- **Threshold.** Applied in the vector search. In hybrid mode with text matches it applies after the fusion, because the place of a text match in the vector ranking counts, as now.
+- **Fusion weights.** `RRF_WEIGHTS` (vector, text), equal by default as now.
+- **Filters during the traversal.** A row that is not allowed leads to others and is not a result. When that would cost more than scanning the rows that are, they are scanned: the limit grows with the square root of the size and the width.
+- **Filter values** are sorted lists that become bitmaps when used (the last 32 are kept), instead of one bitmap always: an installation has many values with few rows.
+- **Vectors of 8 bits in the graph.** In a large index the time goes in waiting for memory. Results are scored again with the full vectors.
+- **Setting.** `SEARCH_ENGINE`: `postgres` by default. With `engine`, PostgreSQL answers until it has loaded. It becomes the default when plan 5 makes starts fast.
+- **Keeping it current.** As in plan 3: triggers record the transaction of each change to a document or its fragments, and a search reads first what changed.

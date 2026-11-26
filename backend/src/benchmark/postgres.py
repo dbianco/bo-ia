@@ -18,11 +18,14 @@ from psycopg import sql
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.api.search import ModoBusqueda, buscar
 from src.db.models import Documento, EvaluacionMatch, Suscripcion, Usuario
 from src.ingestor.contract import DocumentoNormalizado, ingerir_documento
+from src.matching.matchers import Matcher, SqlLoopMatcher
+from src.matching.queue import process_queue
 from src.processor.embeddings import EmbeddingProvider
 from src.search.filters import construir_filtros_suscripcion
+from src.search.postgres import buscar
+from src.search.results import ModoBusqueda
 from src.synthetic.corpus import Corpus
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -109,13 +112,24 @@ class PostgresSearch(_PostgresSystem):
 
 
 class PostgresMatch(_PostgresSystem):
-    """Ingests each document, which evaluates the subscriptions, and reads the
-    matches that were recorded."""
+    """Ingests each document, matches it from the queue, and reads the matches
+    that were recorded."""
 
     name = "postgres-match"
 
-    def __init__(self, url: str, corpus: Corpus, provider: EmbeddingProvider, *, threshold: float) -> None:
+    def __init__(
+        self,
+        url: str,
+        corpus: Corpus,
+        provider: EmbeddingProvider,
+        *,
+        threshold: float,
+        matcher: Matcher | None = None,
+    ) -> None:
         super().__init__(url, corpus, provider, threshold=threshold)
+        self._matcher = matcher or SqlLoopMatcher()
+        if matcher is not None:
+            self.name = "postgres-match-indexed"
         user = Usuario(email="benchmark@example.org", password_hash="!")
         self._session.add(user)
         self._session.flush()
@@ -135,6 +149,7 @@ class PostgresMatch(_PostgresSystem):
     def match(self, document: DocumentoNormalizado) -> set[str]:
         with _environment("SIMILARITY_THRESHOLD", self._threshold):
             result = ingerir_documento(self._session, self._provider, document)
+            process_queue(self._session, self._matcher)
         rows = self._session.scalars(
             select(EvaluacionMatch.suscripcion_id).where(EvaluacionMatch.documento_id == result.documento.id)
         )
