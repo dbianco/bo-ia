@@ -1,4 +1,4 @@
-# 4. Hybrid ranking engine
+# 4. Hybrid ranking engine - DONE
 
 ## Goal
 
@@ -71,9 +71,9 @@ Measured on the synthetic corpus from plan 1 at a proposed scale of 1,000,000 fr
 
 ## Status
 
-Implemented. One criterion is not met at full scale, and the record says the owner accepted the result as it is (see Quality). Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: 48 queries, with and without filters, gave the same response format on both implementations, and 44 the same results; the other 4 are one query in `hybrid` and `all` modes, where each implementation ranks text in its own way. `scale-search` with seed 42 and 1,000,380 fragments reproduced the quality figures, including the unmet one (0.484 against 0.515); no difference in 400 lexical searches; recall@10 at width 128 of 0.973 without filters and 1.000 keeping 1%; hybrid p95 4.4 ms without reading the rows.
+Implemented, and closed with one exception: the quality criterion is not met at full scale (see Quality). Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: 48 queries, with and without filters, gave the same response format on both implementations, and 44 the same results; the other 4 are one query in `hybrid` and `all` modes, where each implementation ranks text in its own way. `scale-search` with seed 42 and 1,000,380 fragments reproduced the quality figures, including the unmet one (0.484 against 0.515); no difference in 400 lexical searches; recall@10 at width 128 of 0.973 without filters and 1.000 keeping 1%; hybrid p95 4.4 ms without reading the rows.
 
-**Not marked as done:** one criterion is not met, and whether its recorded acceptance closes the plan has to be confirmed. The PostgreSQL run at this size was not repeated here: building its index needed more shared memory than the container had.
+**Closed with an exception:** on 2026-11-26 the owner confirmed that the plan is done although hybrid nDCG@10 on paraphrases at 868,000 documents is 0.484 against 0.515. The criterion stays as written and counts as not met. The PostgreSQL run at this size was not repeated in that verification, because building its index needed more shared memory than the container had: the latency comparison with PostgreSQL rests on the earlier measurement under Numbers, made on another machine and before the analyzer fix.
 
 | Criterion | Result | Test |
 |---|---|---|

@@ -1,4 +1,4 @@
-# 7. Notice segmentation and citable results
+# 7. Notice segmentation and citable results - DONE
 
 ## Goal
 
@@ -76,9 +76,9 @@ Measured on generated issues with known notice boundaries, laid out like the rea
 
 ## Status
 
-Implemented. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: the connector ingested the real issue of the fixture into 35 notices and one cover. A second count on the rendered pages gave the same 35 (2, 5, 6, 5, 6, 3, 5 and 3 by page) and the same 6 image notices; the notices opened were on the stated pages; filtering by `provincia` returned them. The real site answered 403 to every weekday tried, from this version and from the previous one, so the issue was read from the fixture.
+Implemented and verified. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 27.2, PostgreSQL 16 with pgvector in Docker): `ruff check src tests ../web` clean; 1,427 tests of the fast suite pass; the real model test and both search implementations of the `slow` suite pass; `pytest -m docker` passes with the real model, in a separate compose project. By hand: the connector ingested the real issue of the fixture into 35 notices and one cover. A second count on the rendered pages gave the same 35 (2, 5, 6, 5, 6, 3, 5 and 3 by page) and the same 6 image notices; the notices opened were on the stated pages; filtering by `provincia` returned them. The real site answered 403 to every weekday tried, from this version and from the previous one, so the issue was read from the fixture.
 
-**Not marked as done:** a person has to confirm the count of 35. Sections 1, 2, 3 and 5 of the real gazette have not been seen.
+On 2026-11-26 the owner confirmed the count of 35 notices. Known limit: sections 1, 2, 3 and 5 of the real gazette have not been seen.
 
 | Criterion | Result | Test |
 |---|---|---|
@@ -86,7 +86,7 @@ Implemented. Verified on 2026-11-26 on an Apple M4 Pro (14 cores, 24 GB, macOS 2
 | No text lost | Met, on the generated issues and on the fixture | same test, `::test_real_pdf_loses_no_text` and `tests/connectors/test_boletin_cba.py::test_no_text_of_the_issue_is_lost_between_extraction_and_documents` |
 | Every result has a number and a page | Met for segmented issues. Text without a closing line is returned with its page, no number and `segmented: false` | `tests/api/test_notices.py::test_every_result_of_a_segmented_source_has_a_number_and_a_page`, `::test_an_unsegmented_document_says_so_and_has_a_page` |
 | Each declared filter finds connector documents | Met | `tests/api/test_notices.py::test_provincia_filter_...`, `::test_municipio_filter_...`, `::test_organismo_and_monto_filters_...` |
-| Fixture: notices equal the count | 35 found, 35 counted: 2, 5, 6, 5, 6, 3, 5 and 3 ending on pages 1 to 8 | `tests/connectors/test_boletin_cba_segmenter.py::test_real_pdf_has_the_number_of_notices_counted_by_eye` |
+| Fixture: notices equal the count | Met: 35 found, and the count of 35 confirmed by the owner: 2, 5, 6, 5, 6, 3, 5 and 3 ending on pages 1 to 8 | `tests/connectors/test_boletin_cba_segmenter.py::test_real_pdf_has_the_number_of_notices_counted_by_eye` |
 
 The generator of issues shares no code with the splitter, but the same author wrote both. The fixture is the only real issue it was checked with.
 
